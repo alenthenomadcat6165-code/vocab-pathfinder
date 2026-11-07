@@ -57,7 +57,7 @@ const server = http.createServer(async (req, res) => {
       if (!body.message || typeof body.message !== 'string') {
         return sendJson(res, 400, { error: 'Please send a learning question.' });
       }
-      const answer = await askOllama(body.message);
+      const answer = await askOllama(body.message, String(body.context || ''), body.history || []);
       return sendJson(res, 200, { answer });
     } catch (error) {
       const status = error.code === 'OLLAMA_OFFLINE' ? 503 : 500;

@@ -89,6 +89,8 @@ function startPractice(type) { if (type === 'chat') return openChat(); startAiPr
 
 function openChat() {
   state.mode = 'chat';
+  state.chatHistory = [];
+  state.chatContext = state.chatContext || '';
   openWorkspace('Optional AI guide · Ollama', 'Ask a learning question');
   $('#question-count').textContent = 'Optional';
   $('#workspace-content').innerHTML = '<div class="chat-log" id="chat-log"><div class="bubble guide">Hi! I can explain a word, help with a sentence, or suggest a reading strategy. You can also close this and use multiple-choice practice anytime.</div></div><form class="chat-form" id="chat-form"><input id="chat-input" autocomplete="off" placeholder="Ask about a word or reading idea…" /><button class="primary" id="chat-send">Send <span>→</span></button></form><p class="small-note">This is optional. Your question stays on this computer and goes to local Ollama through the backend.</p>';
@@ -101,10 +103,11 @@ async function sendMessage(message) {
   const sendButton = $('#chat-send');
   if (sendButton) sendButton.disabled = true;
   try {
-    const response = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message }) });
+    const response = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, context: state.chatContext || '', history: state.chatHistory || [] }) });
     const data = await response.json();
     const thinking = [...document.querySelectorAll('.bubble.guide')].pop();
     if (thinking) thinking.textContent = data.answer || data.error || 'The guide could not answer.';
+    if (data.answer) { state.chatHistory = [...(state.chatHistory || []), { role: 'user', content: message }, { role: 'assistant', content: data.answer }].slice(-8); }
   } catch {
     const thinking = [...document.querySelectorAll('.bubble.guide')].pop();
     if (thinking) thinking.textContent = 'I could not reach the local guide. Make sure Ollama is running, then try again.';
@@ -117,6 +120,7 @@ function addBubble(kind, text) { const log = $('#chat-log'); if (!log) return; c
 function sendChat(event) { event.preventDefault(); const input = $('#chat-input'); const message = input.value.trim(); if (!message) return; input.value = ''; sendMessage(message); }
 
 async function startAiPractice(type = 'mixed') {
+  if (type === 'ai') type = 'mixed';
   const progress = window.progressStore.loadProgress();
   if (progress.latestLevel === 'Not measured yet') return startAssessment();
   state.mode = 'ai-practice';
@@ -137,7 +141,8 @@ async function startAiPractice(type = 'mixed') {
     renderAiQuestion();
   } catch (error) {
     $('#question-count').textContent = 'Needs attention';
-    $('#workspace-content').innerHTML = `<div class="result"><h3>I couldn’t make the questions.</h3><p>${error.message} Make sure Ollama is running, then use “My AI path” to try again.</p></div>`;
+    $('#workspace-content').innerHTML = `<div class="result"><h3>I couldn’t make the questions.</h3><p>${error.message} Make sure Ollama is running, then try again.</p><button class="primary" id="retry-ai">Try again <span>↻</span></button></div>`;
+    $('#retry-ai').addEventListener('click', () => startAiPractice(type));
   }
 }
 
@@ -145,8 +150,9 @@ function renderAiQuestion() {
   const question = state.questions[state.index];
   $('#question-count').textContent = `${state.index + 1} / 6`;
   const passage = state.passage && state.index === 0 ? `<div class="result"><p><strong>Read this first:</strong> ${state.passage}</p></div>` : '';
-  $('#workspace-content').innerHTML = `${passage}<div class="question"><h3>${question.prompt}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${choice}</button>`).join('')}</div><div class="action-row"><span class="small-note">Choose one answer. You do not need to type.</span><button class="primary" id="next-question" disabled>${state.index === 5 ? 'Finish practice' : 'Next'} <span>→</span></button></div></div>`;
+  $('#workspace-content').innerHTML = `${passage}<div class="question"><h3>${question.prompt}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${choice}</button>`).join('')}</div><div class="action-row"><button class="secondary" id="ask-current-question">Ask about this question</button><button class="primary" id="next-question" disabled>${state.index === 5 ? 'Finish practice' : 'Next'} <span>→</span></button></div><p class="small-note">Choose one answer. You do not need to type.</p></div>`;
   let selected = null;
+  $('#ask-current-question').addEventListener('click', () => { state.chatContext = `Practice type: ${state.practiceType || 'personal path'}\nQuestion ${state.index + 1} of 6: ${question.prompt}\nChoices: ${question.choices.join(' | ')}\nThe student wants help with this exact question. Give a hint or explain the skill without giving away the answer unless they ask for the answer.`; openChat(); });
   document.querySelectorAll('[data-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-choice]').forEach((item) => item.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.choice); $('#next-question').disabled = false; }));
   $('#next-question').addEventListener('click', () => { state.answers.push(selected); state.explanations.push(question.explanation); state.index += 1; if (state.index < 6) renderAiQuestion(); else finishAiPractice(); });
 }
@@ -159,7 +165,9 @@ function finishAiPractice() {
   renderProgress();
   openWorkspace('Practice complete', 'You finished your six-question path');
   $('#question-count').textContent = 'Complete';
-  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>${score === 100 ? 'Excellent work—your choices show strong understanding.' : 'Nice effort. The next practice can focus on the skills that need more time.'}</p><div class="action-row"><span class="small-note">Your progress is saved on this computer.</span><button class="secondary" id="again-button">Make six more questions →</button></div></div>`;
+  const review = state.questions.map((question, index) => `Q${index + 1}: ${question.prompt} Student choice: ${question.choices[state.answers[index]] || 'none'}. Correct choice: ${question.choices[question.answer]}.`).join('\n');
+  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>${score === 100 ? 'Excellent work—your choices show strong understanding.' : 'Nice effort. The next practice can focus on the skills that need more time.'}</p><div class="action-row"><button class="secondary" id="review-button">Ask about this practice →</button><button class="secondary" id="again-button">Make six more questions →</button></div><p class="small-note">Your progress is saved on this computer.</p></div>`;
+  $('#review-button').addEventListener('click', () => { state.chatContext = `The student just completed a connected six-question ${state.practiceType || 'personal'} practice. Here is the review:\n${review}\nHelp the student notice patterns and choose what to practice next.`; openChat(); });
   $('#again-button').addEventListener('click', () => startAiPractice(state.practiceType));
 }
 function renderPracticeQuestion(type) { const question = state.questions[state.index]; $('#question-count').textContent = `${state.index + 1} / ${state.questions.length}`; $('#workspace-content').innerHTML = `${type === 'reading' ? `<div class="result"><p>${readingItem.passage}</p></div>` : ''}<div class="question"><h3>${question.prompt}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${choice}</button>`).join('')}</div><div class="action-row"><span class="small-note">Practice is for learning, not ranking.</span><button class="primary" id="next-question" disabled>${state.index === state.questions.length - 1 ? 'Finish' : 'Next'} <span>→</span></button></div></div>`; let selected = null; document.querySelectorAll('[data-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-choice]').forEach((item) => item.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.choice); $('#next-question').disabled = false; })); $('#next-question').addEventListener('click', () => { state.answers.push(selected); state.index += 1; if (state.index < state.questions.length) renderPracticeQuestion(type); else { const score = Math.round((state.answers.filter((answer, index) => answer === state.questions[index].answer).length / state.questions.length) * 100); window.progressStore.saveProgress(type === 'vocabulary' ? { vocabularyScore: score } : { readingScore: score }); renderProgress(); openWorkspace(type === 'vocabulary' ? 'Vocabulary lab' : 'Reading trail', 'Nice work—notice what you learned'); $('#question-count').textContent = 'Complete'; $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>${score === 100 ? 'You have a strong handle on this practice set.' : 'Every attempt gives you a clue about what to practice next.'}</p></div>`; } }); }
