@@ -1,0 +1,9 @@
+{
+  "name": "vocab-pathfinder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A gentle, personalized vocabulary and reading practice app.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
