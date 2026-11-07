@@ -83,15 +83,56 @@ function finishQuestionSet() {
   showPath(finalLevel, refinedScore, progress);
 }
 
-function showPath(level, score) { openWorkspace('Your personal path', 'Here is your next best step'); $('#question-count').textContent = 'Complete'; $('#workspace-content').innerHTML = `<div class="result"><h3>You are at: ${level}</h3><p>Your closer check was ${score}%. We’ll use this as a starting point and adjust as you practice.</p><div class="action-row"><span class="small-note">Next: ask your guide for a focused activity.</span><button class="primary" id="open-guide">Meet my guide <span>→</span></button></div></div>`; $('#open-guide').addEventListener('click', () => openChat(`I just finished my Vocab Pathfinder check. My estimated English learning level is “${level}”. Please give me one short vocabulary or reading activity that matches this level, explain what skill it practices, and encourage me kindly.`)); }
+function showPath(level, score) { openWorkspace('Your personal path', 'Here is your next best step'); $('#question-count').textContent = 'Ready'; $('#workspace-content').innerHTML = `<div class="result"><h3>You are at: ${level}</h3><p>Your closer check was ${score}%. We’ll use this as a starting point and adjust as you practice.</p><div class="action-row"><span class="small-note">Your guide will make six multiple-choice questions.</span><button class="primary" id="open-guide">Make my 6-question practice <span>→</span></button></div></div>`; $('#open-guide').addEventListener('click', () => startAiPractice('mixed')); }
 
-function openChat(firstMessage = '') { state.mode = 'chat'; openWorkspace('Personal learning guide', 'Ask for your next activity'); $('#question-count').textContent = 'Ollama · local'; $('#workspace-content').innerHTML = `<div class="chat-log" id="chat-log"></div><form class="chat-form" id="chat-form"><input id="chat-input" autocomplete="off" placeholder="Ask about a word, sentence, or reading idea…" /><button class="primary" id="chat-send">Send <span>→</span></button></form><p class="small-note">Your message goes to Ollama on this computer through the local server.</p>`; $('#chat-form').addEventListener('submit', sendChat); if (firstMessage) sendMessage(firstMessage); }
+function startPractice(type) { startAiPractice(type); }
 
-function addBubble(kind, text) { const log = $('#chat-log'); if (!log) return; const bubble = document.createElement('div'); bubble.className = `bubble ${kind}`; bubble.textContent = text; log.appendChild(bubble); log.scrollTop = log.scrollHeight; }
-async function sendMessage(message) { addBubble('student', message); addBubble('guide', 'Thinking…'); const sendButton = $('#chat-send'); if (sendButton) sendButton.disabled = true; try { const response = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message }) }); const data = await response.json(); const thinking = [...document.querySelectorAll('.bubble.guide')].pop(); if (thinking) thinking.textContent = data.answer || data.error || 'The guide could not answer.'; } catch { const thinking = [...document.querySelectorAll('.bubble.guide')].pop(); if (thinking) thinking.textContent = 'I could not reach the local guide. Make sure Ollama is running, then try again.'; } finally { if (sendButton) sendButton.disabled = false; } }
-function sendChat(event) { event.preventDefault(); const input = $('#chat-input'); const message = input.value.trim(); if (!message) return; input.value = ''; sendMessage(message); }
+async function startAiPractice(type = 'mixed') {
+  const progress = window.progressStore.loadProgress();
+  if (progress.latestLevel === 'Not measured yet') return startAssessment();
+  state.mode = 'ai-practice';
+  state.practiceType = type;
+  openWorkspace('Personal learning guide · Ollama', 'Making six multiple-choice problems');
+  $('#question-count').textContent = 'Thinking…';
+  $('#workspace-content').innerHTML = '<div class="result"><h3>Thinking…</h3><p>Your local AI is making six questions for your level. You will choose an answer for each one—no typing needed.</p></div>';
+  try {
+    const response = await fetch('/api/practice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: progress.latestLevel, type }) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'The AI could not make practice right now.');
+    state.questions = data.questions;
+    state.passage = data.passage;
+    state.index = 0;
+    state.answers = [];
+    state.explanations = [];
+    openWorkspace(type === 'reading' ? 'Reading trail · AI practice' : type === 'vocabulary' ? 'Vocabulary lab · AI practice' : 'Personal path · AI practice', data.title || 'Six questions made for you');
+    renderAiQuestion();
+  } catch (error) {
+    $('#question-count').textContent = 'Needs attention';
+    $('#workspace-content').innerHTML = `<div class="result"><h3>I couldn’t make the questions.</h3><p>${error.message} Make sure Ollama is running, then use “My AI path” to try again.</p></div>`;
+  }
+}
 
-function startPractice(type) { if (type === 'chat') return openChat(); state.mode = type; state.questions = type === 'vocabulary' ? vocabularyItems.map((item) => ({ prompt: `What does “${item.word}” mean?`, choices: item.choices, answer: item.answer })) : [readingItem]; state.index = 0; state.answers = []; openWorkspace(type === 'vocabulary' ? 'Vocabulary lab' : 'Reading trail', type === 'vocabulary' ? 'Practice one useful word at a time' : 'Read closely, then show what you understood'); renderPracticeQuestion(type); }
+function renderAiQuestion() {
+  const question = state.questions[state.index];
+  $('#question-count').textContent = `${state.index + 1} / 6`;
+  const passage = state.passage && state.index === 0 ? `<div class="result"><p><strong>Read this first:</strong> ${state.passage}</p></div>` : '';
+  $('#workspace-content').innerHTML = `${passage}<div class="question"><h3>${question.prompt}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${choice}</button>`).join('')}</div><div class="action-row"><span class="small-note">Choose one answer. You do not need to type.</span><button class="primary" id="next-question" disabled>${state.index === 5 ? 'Finish practice' : 'Next'} <span>→</span></button></div></div>`;
+  let selected = null;
+  document.querySelectorAll('[data-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-choice]').forEach((item) => item.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.choice); $('#next-question').disabled = false; }));
+  $('#next-question').addEventListener('click', () => { state.answers.push(selected); state.explanations.push(question.explanation); state.index += 1; if (state.index < 6) renderAiQuestion(); else finishAiPractice(); });
+}
+
+function finishAiPractice() {
+  const score = Math.round((state.answers.filter((answer, index) => answer === state.questions[index].answer).length / 6) * 100);
+  const progress = window.progressStore.loadProgress();
+  const changes = state.practiceType === 'vocabulary' ? { vocabularyScore: score } : state.practiceType === 'reading' ? { readingScore: score } : {};
+  window.progressStore.saveProgress(changes);
+  renderProgress();
+  openWorkspace('Practice complete', 'You finished your six-question path');
+  $('#question-count').textContent = 'Complete';
+  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>${score === 100 ? 'Excellent work—your choices show strong understanding.' : 'Nice effort. The next practice can focus on the skills that need more time.'}</p><div class="action-row"><span class="small-note">Your progress is saved on this computer.</span><button class="secondary" id="again-button">Make six more questions →</button></div></div>`;
+  $('#again-button').addEventListener('click', () => startAiPractice(state.practiceType));
+}
 function renderPracticeQuestion(type) { const question = state.questions[state.index]; $('#question-count').textContent = `${state.index + 1} / ${state.questions.length}`; $('#workspace-content').innerHTML = `${type === 'reading' ? `<div class="result"><p>${readingItem.passage}</p></div>` : ''}<div class="question"><h3>${question.prompt}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${choice}</button>`).join('')}</div><div class="action-row"><span class="small-note">Practice is for learning, not ranking.</span><button class="primary" id="next-question" disabled>${state.index === state.questions.length - 1 ? 'Finish' : 'Next'} <span>→</span></button></div></div>`; let selected = null; document.querySelectorAll('[data-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-choice]').forEach((item) => item.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.choice); $('#next-question').disabled = false; })); $('#next-question').addEventListener('click', () => { state.answers.push(selected); state.index += 1; if (state.index < state.questions.length) renderPracticeQuestion(type); else { const score = Math.round((state.answers.filter((answer, index) => answer === state.questions[index].answer).length / state.questions.length) * 100); window.progressStore.saveProgress(type === 'vocabulary' ? { vocabularyScore: score } : { readingScore: score }); renderProgress(); openWorkspace(type === 'vocabulary' ? 'Vocabulary lab' : 'Reading trail', 'Nice work—notice what you learned'); $('#question-count').textContent = 'Complete'; $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>${score === 100 ? 'You have a strong handle on this practice set.' : 'Every attempt gives you a clue about what to practice next.'}</p></div>`; } }); }
 
-$('#start-button').addEventListener('click', startAssessment); $('#refresh-status').addEventListener('click', refreshStatus); document.querySelectorAll('[data-practice]').forEach((button) => button.addEventListener('click', () => startPractice(button.dataset.practice))); renderProgress(); refreshStatus();
+$('#start-button').addEventListener('click', startAssessment); $('#path-link').addEventListener('click', () => startAiPractice('mixed')); $('#refresh-status').addEventListener('click', refreshStatus); document.querySelectorAll('[data-practice]').forEach((button) => button.addEventListener('click', () => startPractice(button.dataset.practice))); renderProgress(); refreshStatus();

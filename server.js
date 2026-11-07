@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
-const { askOllama, checkOllama } = require('./ollama-client');
+const { askOllama, checkOllama, createPractice } = require('./ollama-client');
 
 const PORT = Number(process.env.PORT || 3000);
 const publicDir = path.join(__dirname, 'public');
@@ -62,6 +62,18 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       const status = error.code === 'OLLAMA_OFFLINE' ? 503 : 500;
       return sendJson(res, status, { error: error.message || 'The learning guide could not answer.' });
+    }
+  }
+
+  if (req.method === 'POST' && requestUrl.pathname === '/api/practice') {
+    try {
+      const body = JSON.parse(await readBody(req));
+      if (!body.level || !body.type) return sendJson(res, 400, { error: 'A level and practice type are needed.' });
+      const practice = await createPractice({ level: String(body.level), type: String(body.type) });
+      return sendJson(res, 200, practice);
+    } catch (error) {
+      const status = error.code === 'OLLAMA_OFFLINE' ? 503 : 500;
+      return sendJson(res, status, { error: error.message || 'The AI could not create practice.' });
     }
   }
 
