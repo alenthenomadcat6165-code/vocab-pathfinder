@@ -15,6 +15,7 @@
 - Version 1 has a two-step English check, with vocabulary, grammar, spelling, and reading questions.
 - It gives an estimated level and opens a kind, local AI learning guide.
 - The local AI creates six multiple-choice questions for each practice set; students choose answers instead of typing to a chatbot.
+- An optional AI chat is also available for explanations and learning questions.
 - Vocabulary quizzes, reading practice, and progress tracking work in the browser.
 - The backend sends requests to local Ollama at `http://127.0.0.1:11434` using `gemma3:1b`.
 - The AI receives the project safety and teaching instructions from `BRIEF.md` with every message.

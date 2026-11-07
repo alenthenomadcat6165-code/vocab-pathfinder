@@ -85,7 +85,36 @@ function finishQuestionSet() {
 
 function showPath(level, score) { openWorkspace('Your personal path', 'Here is your next best step'); $('#question-count').textContent = 'Ready'; $('#workspace-content').innerHTML = `<div class="result"><h3>You are at: ${level}</h3><p>Your closer check was ${score}%. We’ll use this as a starting point and adjust as you practice.</p><div class="action-row"><span class="small-note">Your guide will make six multiple-choice questions.</span><button class="primary" id="open-guide">Make my 6-question practice <span>→</span></button></div></div>`; $('#open-guide').addEventListener('click', () => startAiPractice('mixed')); }
 
-function startPractice(type) { startAiPractice(type); }
+function startPractice(type) { if (type === 'chat') return openChat(); startAiPractice(type); }
+
+function openChat() {
+  state.mode = 'chat';
+  openWorkspace('Optional AI guide · Ollama', 'Ask a learning question');
+  $('#question-count').textContent = 'Optional';
+  $('#workspace-content').innerHTML = '<div class="chat-log" id="chat-log"><div class="bubble guide">Hi! I can explain a word, help with a sentence, or suggest a reading strategy. You can also close this and use multiple-choice practice anytime.</div></div><form class="chat-form" id="chat-form"><input id="chat-input" autocomplete="off" placeholder="Ask about a word or reading idea…" /><button class="primary" id="chat-send">Send <span>→</span></button></form><p class="small-note">This is optional. Your question stays on this computer and goes to local Ollama through the backend.</p>';
+  $('#chat-form').addEventListener('submit', sendChat);
+}
+
+async function sendMessage(message) {
+  addBubble('student', message);
+  addBubble('guide', 'Thinking…');
+  const sendButton = $('#chat-send');
+  if (sendButton) sendButton.disabled = true;
+  try {
+    const response = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message }) });
+    const data = await response.json();
+    const thinking = [...document.querySelectorAll('.bubble.guide')].pop();
+    if (thinking) thinking.textContent = data.answer || data.error || 'The guide could not answer.';
+  } catch {
+    const thinking = [...document.querySelectorAll('.bubble.guide')].pop();
+    if (thinking) thinking.textContent = 'I could not reach the local guide. Make sure Ollama is running, then try again.';
+  } finally {
+    if (sendButton) sendButton.disabled = false;
+  }
+}
+
+function addBubble(kind, text) { const log = $('#chat-log'); if (!log) return; const bubble = document.createElement('div'); bubble.className = `bubble ${kind}`; bubble.textContent = text; log.appendChild(bubble); log.scrollTop = log.scrollHeight; }
+function sendChat(event) { event.preventDefault(); const input = $('#chat-input'); const message = input.value.trim(); if (!message) return; input.value = ''; sendMessage(message); }
 
 async function startAiPractice(type = 'mixed') {
   const progress = window.progressStore.loadProgress();
