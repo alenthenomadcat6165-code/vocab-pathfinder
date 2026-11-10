@@ -38,15 +38,12 @@ function renderProgress() {
 
 async function refreshStatus() {
   $('#ollama-status').textContent = 'Checking assistant status…';
-  $('#status-dot').className = 'status-dot';
   try {
     const response = await fetch('/api/health');
     const data = await response.json();
     if (!data.ok) throw new Error(data.error);
-    $('#status-dot').className = 'status-dot good';
     $('#ollama-status').textContent = 'Ready';
   } catch (error) {
-    $('#status-dot').className = 'status-dot bad';
     $('#ollama-status').textContent = 'Unavailable';
   }
 }
