@@ -24,6 +24,8 @@
 - Vocabulary lessons are sequential: each lesson has six questions, and completing one unlocks the next dot.
 - Reading books appear in two columns on larger screens and one column on phones.
 - Vocabulary now has 110 spaced vertical path dots, and Reading now has 20 sample passages.
+- Each reading passage now has three paragraphs with at least five sentences per paragraph.
+- Reading questions stay locked until a read-aloud recording finishes with a transcript.
 - Vocabulary quizzes, reading practice, and progress tracking work in the browser.
 - The backend sends requests to local Ollama at `http://127.0.0.1:11434` using `gemma3:1b`.
 - The AI receives the project safety and teaching instructions from `BRIEF.md` with every message.

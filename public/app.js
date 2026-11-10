@@ -68,7 +68,7 @@ const readingSeeds = [
   ['The Shared Shelf', 'Students placed finished books on a shared shelf with a short note about each one. The notes helped classmates choose books that matched their interests.', 'What was the purpose of the notes?', ['To help classmates choose books', 'To hide the books', 'To count the shelves', 'To change the stories'], 0]
 ];
 function expandReadingPassage(passage, title) {
-  return `${passage} The setting gives the reader a clear place to begin. The main character notices something that needs attention.\n\nThe next step follows from that first observation. The character makes a choice and learns from what happens. Small details show why the choice matters.\n\nBy the end, the situation has changed in a useful way. The reader can use the details to think about the main idea. ${title} leaves one idea to remember.`;
+  return `${passage} The setting gives the reader a clear place to begin. The main character notices something that needs attention. These details introduce the problem in the passage. They also give the reader a reason to keep reading.\n\nThe next step follows from that first observation. The character makes a choice and learns from what happens. Small details show why the choice matters. The choice changes what happens next. The middle of the passage gives clues about the main idea.\n\nBy the end, the situation has changed in a useful way. The reader can use the details to think about the main idea. The ending connects back to the earlier events. It also leaves a question for the reader to consider. ${title} leaves one idea to remember.`;
 }
 const readingBooks = readingSeeds.map(([title, passage, prompt, choices, answer]) => ({ title, author: 'Reading selection', passage: expandReadingPassage(passage, title), questions: [{ prompt, choices, answer }] }));
 
@@ -225,9 +225,19 @@ function openBook(index) {
   openWorkspace('Reading', book.title);
   $('#question-count').textContent = 'Read aloud';
   const paragraphs = book.passage.split('\n\n').map((paragraph) => `<p>${paragraph}</p>`).join('');
-  $('#workspace-content').innerHTML = `<article class="book-page">${paragraphs}</article><div class="reading-tools"><button class="primary" id="start-reading">Start reading aloud</button><button class="secondary" id="stop-reading" disabled>Stop</button><span id="speech-status" class="small-note">No recording</span></div><div class="result"><h3>Transcript</h3><p id="reading-transcript">Your spoken words will appear here.</p><button class="secondary" id="rate-reading" disabled>Rate reading</button><p id="reading-feedback" class="small-note"></p></div><div class="result"><h3>Questions</h3><div id="book-questions">${book.questions.map((question, qIndex) => `<div class="book-question"><p><strong>${qIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-book-question="${qIndex}" data-book-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div>`).join('')}</div><div class="action-row"><button class="primary" id="check-book">Check answers</button><span id="book-score" class="small-note"></span></div></div>`;
+  $('#workspace-content').innerHTML = `<article class="book-page">${paragraphs}</article><div class="reading-tools"><button class="primary" id="start-reading">Start reading aloud</button><button class="secondary" id="stop-reading" disabled>Stop</button><span id="speech-status" class="small-note">No recording</span></div><div class="result"><h3>Transcript</h3><p id="reading-transcript">Your spoken words will appear here.</p><button class="secondary" id="rate-reading" disabled>Rate reading</button><p id="reading-feedback" class="small-note"></p></div><div class="result"><h3>Questions</h3><p id="book-questions-lock">Finish reading aloud to unlock the questions.</p><div id="book-questions" class="hidden"></div><div id="book-question-actions" class="action-row hidden"><button class="primary" id="check-book">Check answers</button><span id="book-score" class="small-note"></span></div></div>`;
+  $('#start-reading').addEventListener('click', startReadingAloud); $('#stop-reading').addEventListener('click', stopReadingAloud); $('#rate-reading').addEventListener('click', rateReading);
+}
+
+function unlockReadingQuestions() {
+  const book = state.currentBook;
+  if (!book || !state.readingTranscript.trim()) return;
+  $('#book-questions-lock').classList.add('hidden');
+  $('#book-questions').classList.remove('hidden');
+  $('#book-question-actions').classList.remove('hidden');
+  $('#book-questions').innerHTML = book.questions.map((question, qIndex) => `<div class="book-question"><p><strong>${qIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-book-question="${qIndex}" data-book-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div>`).join('');
   document.querySelectorAll('[data-book-question]').forEach((button) => button.addEventListener('click', () => { const qIndex = Number(button.dataset.bookQuestion); document.querySelectorAll(`[data-book-question="${qIndex}"]`).forEach((item) => item.classList.remove('selected')); button.classList.add('selected'); }));
-  $('#start-reading').addEventListener('click', startReadingAloud); $('#stop-reading').addEventListener('click', stopReadingAloud); $('#rate-reading').addEventListener('click', rateReading); $('#check-book').addEventListener('click', () => { const score = book.questions.reduce((total, question, qIndex) => total + (Number(document.querySelector(`[data-book-question="${qIndex}"].selected`)?.dataset.bookChoice) === question.answer ? 1 : 0), 0); $('#book-score').textContent = `${score} / ${book.questions.length} correct`; });
+  $('#check-book').addEventListener('click', () => { const score = book.questions.reduce((total, question, qIndex) => total + (Number(document.querySelector(`[data-book-question="${qIndex}"].selected`)?.dataset.bookChoice) === question.answer ? 1 : 0), 0); $('#book-score').textContent = `${score} / ${book.questions.length} correct`; });
 }
 
 function startReadingAloud() {
@@ -237,7 +247,7 @@ function startReadingAloud() {
   recognition.onstart = () => { $('#speech-status').textContent = 'Listening'; $('#start-reading').disabled = true; $('#stop-reading').disabled = false; };
   recognition.onresult = (event) => { state.readingTranscript = Array.from(event.results).map((result) => result[0].transcript).join(' '); $('#reading-transcript').textContent = state.readingTranscript; $('#rate-reading').disabled = !state.readingTranscript.trim(); };
   recognition.onerror = () => { $('#speech-status').textContent = 'Speech recognition stopped.'; $('#start-reading').disabled = false; $('#stop-reading').disabled = true; };
-  recognition.onend = () => { $('#speech-status').textContent = state.readingTranscript ? 'Transcript ready' : 'No recording'; $('#start-reading').disabled = false; $('#stop-reading').disabled = true; };
+  recognition.onend = () => { $('#speech-status').textContent = state.readingTranscript ? 'Transcript ready' : 'No recording'; $('#start-reading').disabled = false; $('#stop-reading').disabled = true; if (state.readingTranscript.trim()) unlockReadingQuestions(); };
   recognition.start();
 }
 
