@@ -178,7 +178,7 @@ function vocabularyQuestions(item) {
   const otherWords = vocabularyPath.filter((entry) => entry.word !== item.word).slice(0, 5).map((entry) => entry.meaning);
   return [
     { prompt: `What does “${item.word}” mean?`, choices: [item.meaning, ...otherWords.slice(0, 3)], answer: 0 },
-    { prompt: `Which sentence uses “${item.word}” correctly?`, choices: [item.example, `The ${item.word} was a color of the sky.`, `I ${item.word} the sandwich quickly.`, `The word ${item.word} means yesterday.`], answer: 0 },
+    { prompt: `Which sentence uses “${item.word}” correctly?`, choices: [item.word === 'observe' ? 'The scientist observed the bird from the window.' : `The word “${item.word}” is used in a sentence that matches its meaning.`, `The ${item.word} was a color of the sky.`, `The word ${item.word} means yesterday.`, `I put the word ${item.word} inside a box.`], answer: 0 },
     { prompt: `What skill does this lesson practice?`, choices: [item.skill, 'Drawing maps', 'Measuring distance', 'Playing an instrument'], answer: 0 },
     { prompt: `Which clue would help you understand “${item.word}”?`, choices: ['The words around it in a sentence', 'The number of letters only', 'The color of the page', 'The time of day'], answer: 0 },
     { prompt: `Which is closest to the meaning of “${item.word}”?`, choices: [item.meaning, ...otherWords.slice(1, 4)], answer: 0 },
@@ -192,19 +192,23 @@ function openVocabularyLesson(index) {
   state.vocabQuestions = vocabularyQuestions(item);
   state.vocabQuestionIndex = 0;
   state.vocabAnswers = [];
+  window.progressStore.saveProgress({ currentVocabLesson: index, currentVocabQuestion: 0 });
   openWorkspace('Vocabulary lesson', item.word);
-  renderVocabularyQuestion();
+  $('#question-count').textContent = 'Lesson';
+  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>Lesson ${index + 1} of ${vocabularyPath.length}</small><h3>${item.word}</h3><p>${item.meaning}</p><p><strong>Example:</strong> ${item.example}</p><button class="primary" id="start-vocab-quiz">Start six-question quiz <span>→</span></button></div><button class="secondary" id="back-to-path">Back to path</button>`;
+  $('#start-vocab-quiz').addEventListener('click', renderVocabularyQuestion);
+  $('#back-to-path').addEventListener('click', showVocabularyPage);
 }
 
 function renderVocabularyQuestion() {
   const item = vocabularyPath[state.vocabLessonIndex];
   const question = state.vocabQuestions[state.vocabQuestionIndex];
   $('#question-count').textContent = `${state.vocabQuestionIndex + 1} / 6`;
-  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>Lesson ${state.vocabLessonIndex + 1} of ${vocabularyPath.length}</small><h3>${item.word}</h3><p>${item.meaning}</p><p><strong>Example:</strong> ${item.example}</p></div><div class="vocab-question"><p><strong>${state.vocabQuestionIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-vocab-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div><div class="action-row"><button class="secondary" id="back-to-path">Back to path</button><button class="primary" id="next-vocab" disabled>${state.vocabQuestionIndex === 5 ? 'Finish lesson' : 'Next'} <span>→</span></button></div>`;
+  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>Lesson ${state.vocabLessonIndex + 1} · Question ${state.vocabQuestionIndex + 1} of 6</small><h3>${item.word}</h3></div><div class="vocab-question"><p><strong>${state.vocabQuestionIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-vocab-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div><div class="action-row"><button class="secondary" id="back-to-path">Back to path</button><button class="primary" id="next-vocab" disabled>${state.vocabQuestionIndex === 5 ? 'Finish lesson' : 'Next'} <span>→</span></button></div>`;
   let selected = null;
   document.querySelectorAll('[data-vocab-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-vocab-choice]').forEach((choice) => choice.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.vocabChoice); $('#next-vocab').disabled = false; }));
   $('#back-to-path').addEventListener('click', showVocabularyPage);
-  $('#next-vocab').addEventListener('click', () => { state.vocabAnswers.push(selected); if (state.vocabQuestionIndex < 5) { state.vocabQuestionIndex += 1; renderVocabularyQuestion(); } else { const progress = window.progressStore.loadProgress(); window.progressStore.saveProgress({ vocabUnlocked: Math.max(progress.vocabUnlocked || 1, state.vocabLessonIndex + 2) }); openWorkspace('Vocabulary lesson', 'Lesson complete'); $('#question-count').textContent = 'Complete'; $('#workspace-content').innerHTML = `<div class="result"><h3>${item.word}</h3><p>Lesson complete. The next dot is now available.</p><button class="primary" id="continue-vocab">Return to path <span>→</span></button></div>`; $('#continue-vocab').addEventListener('click', showVocabularyPage); } });
+  $('#next-vocab').addEventListener('click', () => { state.vocabAnswers.push(selected); if (state.vocabQuestionIndex < 5) { state.vocabQuestionIndex += 1; window.progressStore.saveProgress({ currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: state.vocabQuestionIndex }); renderVocabularyQuestion(); } else { const progress = window.progressStore.loadProgress(); window.progressStore.saveProgress({ vocabUnlocked: Math.max(progress.vocabUnlocked || 1, state.vocabLessonIndex + 2), currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: 6 }); openWorkspace('Vocabulary lesson', 'Lesson complete'); $('#question-count').textContent = 'Complete'; $('#workspace-content').innerHTML = `<div class="result"><h3>${item.word}</h3><p>Lesson complete. The next dot is now available.</p><button class="primary" id="continue-vocab">Return to path <span>→</span></button></div>`; $('#continue-vocab').addEventListener('click', showVocabularyPage); } });
 }
 
 function showReadingPage() {
