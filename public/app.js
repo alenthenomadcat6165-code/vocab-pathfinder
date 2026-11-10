@@ -179,13 +179,18 @@ function vocabularyQuestions(item) {
   const oppositeSentence = `The student used “${item.word}” to mean the opposite of ${item.meaning}.`;
   const unrelatedSentence = `The student used “${item.word}” as the name of a color.`;
   const timeSentence = `The student used “${item.word}” to mean yesterday.`;
+  const makeQuestion = (prompt, choices, questionNumber) => {
+    const shift = (item.word.length + questionNumber) % choices.length;
+    const orderedChoices = choices.slice(shift).concat(choices.slice(0, shift));
+    return { prompt, choices: orderedChoices, answer: (choices.length - shift) % choices.length };
+  };
   return [
-    { prompt: `Which sentence uses “${item.word}” correctly?`, choices: [meaningSentence, oppositeSentence, unrelatedSentence, timeSentence], answer: 0 },
-    { prompt: `Which sentence gives the best clue to the meaning of “${item.word}”?`, choices: [meaningSentence, `The student placed “${item.word}” beside a drawing of a rainbow.`, `The student wrote “${item.word}” on a clock.`, `The student heard “${item.word}” during a song.`], answer: 0 },
-    { prompt: `Which sentence explains what “${item.word}” means?`, choices: [meaningSentence, `The sentence says that “${item.word}” is a kind of sandwich.`, `The sentence says that “${item.word}” is a number.`, `The sentence says that “${item.word}” is a place to sleep.`], answer: 0 },
-    { prompt: `Which sentence would help a reader understand “${item.word}”?`, choices: [meaningSentence, `The reader counted the letters in “${item.word}” but did not read the sentence.`, `The reader looked only at the color of the page.`, `The reader closed the book before seeing “${item.word}”.`], answer: 0 },
-    { prompt: `Which sentence has the closest meaning to “${item.word}”?`, choices: [meaningSentence, oppositeSentence, unrelatedSentence, timeSentence], answer: 0 },
-    { prompt: `Which sentence shows a good way to learn “${item.word}”?`, choices: [`The student wrote a new sentence using “${item.word}” and its meaning.`, `The student skipped the example and guessed every answer.`, `The student erased “${item.word}” before reading it.`, `The student changed “${item.word}” into a random number.`], answer: 0 }
+    makeQuestion(`Which sentence uses “${item.word}” correctly?`, [meaningSentence, oppositeSentence, unrelatedSentence, timeSentence], 0),
+    makeQuestion(`Which sentence gives the best clue to the meaning of “${item.word}”?`, [meaningSentence, `The student placed “${item.word}” beside a drawing of a rainbow.`, `The student wrote “${item.word}” on a clock.`, `The student heard “${item.word}” during a song.`], 1),
+    makeQuestion(`Which sentence explains what “${item.word}” means?`, [meaningSentence, `The sentence says that “${item.word}” is a kind of sandwich.`, `The sentence says that “${item.word}” is a number.`, `The sentence says that “${item.word}” is a place to sleep.`], 2),
+    makeQuestion(`Which sentence would help a reader understand “${item.word}”?`, [meaningSentence, `The reader counted the letters in “${item.word}” but did not read the sentence.`, `The reader looked only at the color of the page.`, `The reader closed the book before seeing “${item.word}”.`], 3),
+    makeQuestion(`Which sentence has the closest meaning to “${item.word}”?`, [meaningSentence, oppositeSentence, unrelatedSentence, timeSentence], 4),
+    makeQuestion(`Which sentence shows a good way to learn “${item.word}”?`, [`The student wrote a new sentence using “${item.word}” and its meaning.`, `The student skipped the example and guessed every answer.`, `The student erased “${item.word}” before reading it.`, `The student changed “${item.word}” into a random number.`], 5)
   ];
 }
 
@@ -211,7 +216,7 @@ function renderVocabularyQuestion() {
   let selected = null;
   document.querySelectorAll('[data-vocab-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-vocab-choice]').forEach((choice) => choice.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.vocabChoice); $('#next-vocab').disabled = false; }));
   $('#back-to-path').addEventListener('click', showVocabularyPage);
-  $('#next-vocab').addEventListener('click', () => { state.vocabAnswers.push(selected); if (state.vocabQuestionIndex < 5) { state.vocabQuestionIndex += 1; window.progressStore.saveProgress({ currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: state.vocabQuestionIndex }); renderVocabularyQuestion(); } else { const progress = window.progressStore.loadProgress(); window.progressStore.saveProgress({ vocabUnlocked: Math.max(progress.vocabUnlocked || 1, state.vocabLessonIndex + 2), currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: 6 }); openWorkspace('Vocabulary lesson', 'Lesson complete'); $('#question-count').textContent = 'Complete'; $('#workspace-content').innerHTML = `<div class="result"><h3>${item.word}</h3><p>Lesson complete. The next dot is now available.</p><button class="primary" id="continue-vocab">Return to path <span>→</span></button></div>`; $('#continue-vocab').addEventListener('click', showVocabularyPage); } });
+  $('#next-vocab').addEventListener('click', () => { state.vocabAnswers.push(selected); if (state.vocabQuestionIndex < 5) { state.vocabQuestionIndex += 1; window.progressStore.saveProgress({ currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: state.vocabQuestionIndex }); renderVocabularyQuestion(); } else { const progress = window.progressStore.loadProgress(); const correctAnswers = state.vocabAnswers.reduce((total, answer, index) => total + (answer === state.vocabQuestions[index].answer ? 1 : 0), 0); const score = Math.round((correctAnswers / state.vocabQuestions.length) * 100); window.progressStore.saveProgress({ vocabularyScore: score, vocabUnlocked: Math.max(progress.vocabUnlocked || 1, state.vocabLessonIndex + 2), currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: 6, sessions: progress.sessions + 1 }); openWorkspace('Vocabulary lesson', 'Lesson complete'); $('#question-count').textContent = `${score}%`; $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${correctAnswers} out of ${state.vocabQuestions.length}. The next dot is now available.</p><button class="primary" id="continue-vocab">Return to path <span>→</span></button></div>`; $('#continue-vocab').addEventListener('click', showVocabularyPage); } });
 }
 
 function showReadingPage() {
