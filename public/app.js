@@ -169,8 +169,25 @@ function sendChat(event) { event.preventDefault(); const input = $('#chat-input'
 function showVocabularyPage() {
   openWorkspace('Vocabulary', 'Word path');
   $('#question-count').textContent = `${vocabularyPath.length} words`;
-  $('#workspace-content').innerHTML = `<p class="muted">Select a point on the path.</p><div class="word-path">${vocabularyPath.map((item, index) => `<button class="word-dot" data-word-index="${index}" aria-label="${item.word}">${index + 1}</button>`).join('')}</div><div id="word-detail" class="result"><h3>${vocabularyPath[0].word}</h3><p>${vocabularyPath[0].meaning}</p><p><strong>Example:</strong> ${vocabularyPath[0].example}</p><small>${vocabularyPath[0].skill}</small></div>`;
-  document.querySelectorAll('[data-word-index]').forEach((button) => button.addEventListener('click', () => { const item = vocabularyPath[Number(button.dataset.wordIndex)]; $('#word-detail').innerHTML = `<h3>${item.word}</h3><p>${item.meaning}</p><p><strong>Example:</strong> ${item.example}</p><small>${item.skill}</small>`; }));
+  $('#workspace-content').innerHTML = `<p class="muted">Select a dot to open its lesson.</p><div class="word-path">${vocabularyPath.map((item, index) => `<button class="word-dot" data-word-index="${index}" aria-label="${item.word}">${index + 1}</button>`).join('')}</div><div id="word-detail" class="result"></div>`;
+  document.querySelectorAll('[data-word-index]').forEach((button) => button.addEventListener('click', () => renderVocabularyLesson(Number(button.dataset.wordIndex))));
+  renderVocabularyLesson(0);
+}
+
+function renderVocabularyLesson(index) {
+  const item = vocabularyPath[index];
+  const otherWords = vocabularyPath.filter((_, itemIndex) => itemIndex !== index).slice(0, 5).map((entry) => entry.meaning);
+  const questions = [
+    { prompt: `What does “${item.word}” mean?`, choices: [item.meaning, ...otherWords.slice(0, 3)], answer: 0 },
+    { prompt: `Which sentence uses “${item.word}” correctly?`, choices: [item.example, `The ${item.word} was a color of the sky.`, `I ${item.word} the sandwich quickly.`, `The word ${item.word} means yesterday.`], answer: 0 },
+    { prompt: `What skill does this lesson practice?`, choices: [item.skill, 'Drawing maps', 'Measuring distance', 'Playing an instrument'], answer: 0 },
+    { prompt: `Which clue would help you understand “${item.word}”?`, choices: ['The words around it in a sentence', 'The number of letters only', 'The color of the page', 'The time of day'], answer: 0 },
+    { prompt: `Which is closest to the meaning of “${item.word}”?`, choices: [item.meaning, ...otherWords.slice(1, 4)], answer: 0 },
+    { prompt: `What should you do after learning “${item.word}”?`, choices: ['Use it in your own sentence', 'Forget the example', 'Skip every question', 'Change the word randomly'], answer: 0 }
+  ];
+  $('#word-detail').innerHTML = `<div class="lesson-heading"><small>Lesson ${index + 1} of ${vocabularyPath.length}</small><h3>${item.word}</h3><p>${item.meaning}</p><p><strong>Example:</strong> ${item.example}</p></div><div class="vocab-questions">${questions.map((question, questionIndex) => `<div class="vocab-question"><p><strong>${questionIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-vocab-question="${questionIndex}" data-vocab-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div>`).join('')}</div><div class="action-row"><button class="primary" id="check-vocab">Check lesson</button><span id="vocab-score" class="small-note"></span></div>`;
+  document.querySelectorAll('[data-vocab-question]').forEach((button) => button.addEventListener('click', () => { const questionIndex = Number(button.dataset.vocabQuestion); document.querySelectorAll(`[data-vocab-question="${questionIndex}"]`).forEach((choice) => choice.classList.remove('selected')); button.classList.add('selected'); }));
+  $('#check-vocab').addEventListener('click', () => { const score = questions.reduce((total, question, questionIndex) => total + (Number(document.querySelector(`[data-vocab-question="${questionIndex}"].selected`)?.dataset.vocabChoice) === question.answer ? 1 : 0), 0); $('#vocab-score').textContent = `${score} / ${questions.length} correct`; });
 }
 
 function showReadingPage() {
