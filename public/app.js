@@ -44,10 +44,10 @@ async function refreshStatus() {
     const data = await response.json();
     if (!data.ok) throw new Error(data.error);
     $('#status-dot').className = 'status-dot good';
-    $('#ollama-status').textContent = 'Assistant available';
+    $('#ollama-status').textContent = 'Ready';
   } catch (error) {
     $('#status-dot').className = 'status-dot bad';
-    $('#ollama-status').textContent = 'Assistant unavailable';
+    $('#ollama-status').textContent = 'Unavailable';
   }
 }
 
@@ -91,7 +91,7 @@ function openChat() {
   state.mode = 'chat';
   state.chatHistory = [];
   state.chatContext = state.chatContext || '';
-  openWorkspace('Assistant', 'Question');
+  openWorkspace('Questions', 'Question');
   $('#question-count').textContent = 'Optional';
   $('#workspace-content').innerHTML = '<div class="chat-log" id="chat-log"><div class="bubble guide">Ask about a word, sentence, or reading passage.</div></div><form class="chat-form" id="chat-form"><input id="chat-input" autocomplete="off" placeholder="Ask a question" /><button class="primary" id="chat-send">Send <span>→</span></button></form>';
   $('#chat-form').addEventListener('submit', sendChat);
@@ -125,7 +125,7 @@ async function startAiPractice(type = 'mixed') {
   if (progress.latestLevel === 'Not measured yet') return startAssessment();
   state.mode = 'ai-practice';
   state.practiceType = type;
-  openWorkspace('Generated practice', 'Generating questions');
+  openWorkspace('Practice set', 'Generating questions');
   $('#question-count').textContent = 'Thinking…';
   $('#workspace-content').innerHTML = '<div class="result"><h3>Generating questions.</h3><p>Six multiple-choice questions are being prepared.</p></div>';
   try {

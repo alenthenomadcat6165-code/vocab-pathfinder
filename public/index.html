@@ -4,26 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vocab Pathfinder</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header class="topbar">
       <a class="brand" href="#top"><span class="brand-mark">✦</span> Vocab Pathfinder</a>
-      <button class="path-link" id="path-link" style="margin-left:auto;margin-right:18px;border:0;background:transparent;color:#c85c36;font-size:13px;font-weight:750;text-decoration:underline">My AI path</button>
+      <button class="path-link" id="path-link" style="margin-left:auto;margin-right:18px;border:0;background:transparent;color:#c85c36;font-size:13px;font-weight:750;text-decoration:underline">My progress</button>
     </header>
 
     <main id="top" class="shell">
       <section class="hero">
         <div>
           <p class="eyebrow">English practice</p>
-          <h1>Reading and vocabulary practice.</h1>
           <p class="hero-copy">Short assessments and practice questions for vocabulary, reading, spelling, and grammar.</p>
           <button class="primary" id="start-button">Begin assessment <span>→</span></button>
         </div>
         <div class="hero-art" aria-hidden="true"><div class="sun"></div><div class="path-line"></div><div class="mountain mountain-one"></div><div class="mountain mountain-two"></div><div class="flag">✦</div></div>
       </section>
 
-      <section class="status-row" aria-label="Assistant status">
+      <section class="status-row" aria-label="Practice support status">
         <span class="status-dot" id="status-dot"></span><span id="ollama-status">Checking assistant status…</span>
         <button class="text-button" id="refresh-status">Refresh</button>
       </section>
@@ -45,12 +44,12 @@
       <section class="practice-grid">
         <article class="practice-card"><span class="card-number">01</span><h3>Vocabulary</h3><p>Questions about word meanings and usage.</p><button class="secondary" data-practice="vocabulary">Open →</button></article>
         <article class="practice-card"><span class="card-number">02</span><h3>Reading</h3><p>A short passage with comprehension questions.</p><button class="secondary" data-practice="reading">Open →</button></article>
-        <article class="practice-card"><span class="card-number">03</span><h3>Generated practice</h3><p>Six questions based on the current level.</p><button class="secondary" data-practice="ai">Open →</button></article>
-        <article class="practice-card"><span class="card-number">04</span><h3>Assistant</h3><p>Questions about words, sentences, and passages.</p><button class="secondary" data-practice="chat">Open →</button></article>
+        <article class="practice-card"><span class="card-number">03</span><h3>Practice set</h3><p>Six questions based on the current level.</p><button class="secondary" data-practice="ai">Open →</button></article>
+        <article class="practice-card"><span class="card-number">04</span><h3>Questions</h3><p>Ask about words, sentences, and passages.</p><button class="secondary" data-practice="chat">Open →</button></article>
       </section>
 
       <footer><span>Vocab Pathfinder</span></footer>
     </main>
-    <script src="/storage.js"></script><script src="/app.js"></script>
+    <script src="storage.js"></script><script src="app.js"></script>
   </body>
 </html>
