@@ -26,6 +26,7 @@ const readingItem = { passage: 'Jordan noticed that the library was quieter than
 
 let state = { mode: null, questions: [], index: 0, answers: [], level: 'Not measured yet', chatMessages: [] };
 const $ = (selector) => document.querySelector(selector);
+const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:3000' : '';
 
 function renderProgress() {
   const progress = window.progressStore.loadProgress();
@@ -39,7 +40,7 @@ function renderProgress() {
 async function refreshStatus() {
   $('#ollama-status').textContent = 'Checking assistant status…';
   try {
-    const response = await fetch('/api/health');
+    const response = await fetch(`${API_BASE}/api/health`);
     const data = await response.json();
     if (!data.ok) throw new Error(data.error);
     $('#ollama-status').textContent = 'Ready';
@@ -100,7 +101,7 @@ async function sendMessage(message) {
   const sendButton = $('#chat-send');
   if (sendButton) sendButton.disabled = true;
   try {
-    const response = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, context: state.chatContext || '', history: state.chatHistory || [] }) });
+    const response = await fetch(`${API_BASE}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, context: state.chatContext || '', history: state.chatHistory || [] }) });
     const data = await response.json();
     const thinking = [...document.querySelectorAll('.bubble.guide')].pop();
     if (thinking) thinking.textContent = data.answer || data.error || 'The guide could not answer.';
@@ -126,7 +127,7 @@ async function startAiPractice(type = 'mixed') {
   $('#question-count').textContent = 'Thinking…';
   $('#workspace-content').innerHTML = '<div class="result"><h3>Generating questions.</h3><p>Six multiple-choice questions are being prepared.</p></div>';
   try {
-    const response = await fetch('/api/practice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: progress.latestLevel, type }) });
+    const response = await fetch(`${API_BASE}/api/practice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: progress.latestLevel, type }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'The AI could not make practice right now.');
     state.questions = data.questions;

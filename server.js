@@ -8,7 +8,7 @@ const PORT = Number(process.env.PORT || 3000);
 const publicDir = path.join(__dirname, 'public');
 
 function sendJson(res, status, data) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': 'null' });
   res.end(JSON.stringify(data));
 }
 
@@ -45,6 +45,11 @@ function serveFile(req, res, pathname) {
 
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, { 'Access-Control-Allow-Origin': 'null', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
+    return res.end();
+  }
 
   if (req.method === 'GET' && requestUrl.pathname === '/api/health') {
     const result = await checkOllama();
