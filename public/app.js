@@ -188,5 +188,4 @@ function showPage(page) {
 
 document.querySelectorAll('.top-tab').forEach((button) => button.addEventListener('click', () => showPage(button.dataset.page)));
 $('#refresh-status').addEventListener('click', refreshStatus);
-document.querySelectorAll('[data-practice]').forEach((button) => button.addEventListener('click', () => showPage(button.dataset.practice === 'ai' ? 'practice' : button.dataset.practice === 'chat' ? 'questions' : button.dataset.practice)));
 renderProgress(); refreshStatus();
