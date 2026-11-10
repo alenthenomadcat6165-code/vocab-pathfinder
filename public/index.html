@@ -10,48 +10,46 @@
     <header class="topbar">
       <a class="brand" href="#top"><span class="brand-mark">✦</span> Vocab Pathfinder</a>
       <button class="path-link" id="path-link" style="margin-left:auto;margin-right:18px;border:0;background:transparent;color:#c85c36;font-size:13px;font-weight:750;text-decoration:underline">My AI path</button>
-      <span class="local-badge">Private on this computer</span>
     </header>
 
     <main id="top" class="shell">
       <section class="hero">
         <div>
-          <p class="eyebrow">Your pace. Your path.</p>
-          <h1>Build stronger reading skills, one clear step at a time.</h1>
-          <p class="hero-copy">A calm practice space that finds what you need next—without ads, energy limits, streaks, or leaderboards.</p>
-          <button class="primary" id="start-button">Find my starting point <span>→</span></button>
+          <p class="eyebrow">English practice</p>
+          <h1>Reading and vocabulary practice.</h1>
+          <p class="hero-copy">Short assessments and practice questions for vocabulary, reading, spelling, and grammar.</p>
+          <button class="primary" id="start-button">Begin assessment <span>→</span></button>
         </div>
         <div class="hero-art" aria-hidden="true"><div class="sun"></div><div class="path-line"></div><div class="mountain mountain-one"></div><div class="mountain mountain-two"></div><div class="flag">✦</div></div>
       </section>
 
-      <section class="status-row" aria-label="Ollama status">
-        <span class="status-dot" id="status-dot"></span><span id="ollama-status">Checking local AI…</span>
-        <button class="text-button" id="refresh-status">Check again</button>
+      <section class="status-row" aria-label="Assistant status">
+        <span class="status-dot" id="status-dot"></span><span id="ollama-status">Checking assistant status…</span>
+        <button class="text-button" id="refresh-status">Refresh</button>
       </section>
 
       <section class="dashboard-grid">
         <article class="panel progress-panel">
           <div class="panel-heading"><div><p class="eyebrow">Your progress</p><h2>Learning map</h2></div><span class="quiet-icon">↗</span></div>
-          <p class="muted">Saved only in this browser for now.</p>
           <div class="level-card"><span>Current level</span><strong id="current-level">Not measured yet</strong><small id="session-count">0 learning sessions</small></div>
-          <div class="skill-list"><div><span>Vocabulary</span><b id="vocab-score">Not started</b></div><div><span>Reading</span><b id="reading-score">Not started</b></div><div><span>Personal path</span><b id="path-score">Waiting for assessment</b></div></div>
+          <div class="skill-list"><div><span>Vocabulary</span><b id="vocab-score">Not started</b></div><div><span>Reading</span><b id="reading-score">Not started</b></div><div><span>Assessment</span><b id="path-score">Not assessed</b></div></div>
         </article>
-        <article class="panel why-panel"><p class="eyebrow">Why this feels different</p><h2>No rushing. No labels that stick.</h2><p>Vocab Pathfinder uses a two-step check to make a helpful estimate, then gives you practice at your pace. A level is a starting point—not a permanent label.</p><div class="quote"><span>“</span><p>Let’s practice this skill together.</p></div></article>
+        <article class="panel why-panel"><p class="eyebrow">Assessment</p><h2>Two parts, one estimate.</h2><p>The assessment covers several English skills, then uses a shorter set of questions to estimate a starting level.</p></article>
       </section>
 
       <section id="workspace" class="workspace panel hidden">
-        <div class="workspace-heading"><div><p class="eyebrow" id="workspace-kicker">Starting point</p><h2 id="workspace-title">Let’s find your path</h2></div><span id="question-count" class="step-count"></span></div>
+        <div class="workspace-heading"><div><p class="eyebrow" id="workspace-kicker">Assessment</p><h2 id="workspace-title">English skills assessment</h2></div><span id="question-count" class="step-count"></span></div>
         <div id="workspace-content"></div>
       </section>
 
       <section class="practice-grid">
-        <article class="practice-card"><span class="card-number">01</span><h3>Vocabulary lab</h3><p>Practice useful words with quick, focused questions.</p><button class="secondary" data-practice="vocabulary">Try a sample →</button></article>
-        <article class="practice-card"><span class="card-number">02</span><h3>Reading trail</h3><p>Read a short passage and show what you understood.</p><button class="secondary" data-practice="reading">Try a sample →</button></article>
-        <article class="practice-card"><span class="card-number">03</span><h3>Personal practice</h3><p>Let local AI make six questions matched to your level.</p><button class="secondary" data-practice="ai">Make my practice →</button></article>
-        <article class="practice-card"><span class="card-number">04</span><h3>Ask your guide</h3><p>Use an optional chat to ask about a word or reading idea.</p><button class="secondary" data-practice="chat">Open AI chat →</button></article>
+        <article class="practice-card"><span class="card-number">01</span><h3>Vocabulary</h3><p>Questions about word meanings and usage.</p><button class="secondary" data-practice="vocabulary">Open →</button></article>
+        <article class="practice-card"><span class="card-number">02</span><h3>Reading</h3><p>A short passage with comprehension questions.</p><button class="secondary" data-practice="reading">Open →</button></article>
+        <article class="practice-card"><span class="card-number">03</span><h3>Generated practice</h3><p>Six questions based on the current level.</p><button class="secondary" data-practice="ai">Open →</button></article>
+        <article class="practice-card"><span class="card-number">04</span><h3>Assistant</h3><p>Questions about words, sentences, and passages.</p><button class="secondary" data-practice="chat">Open →</button></article>
       </section>
 
-      <footer><span>Vocab Pathfinder · Version 1</span><span>Learning data stays on this computer.</span></footer>
+      <footer><span>Vocab Pathfinder</span></footer>
     </main>
     <script src="/storage.js"></script><script src="/app.js"></script>
   </body>
