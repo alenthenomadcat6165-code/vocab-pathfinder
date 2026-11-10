@@ -1,4 +1,10 @@
 const STORAGE_KEY = 'vocab-pathfinder-progress';
+const RESET_KEY = 'vocab-pathfinder-progress-cleared-2026-11-09';
+
+if (!localStorage.getItem(RESET_KEY)) {
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.setItem(RESET_KEY, 'done');
+}
 
 const starterProgress = {
   sessions: 0,

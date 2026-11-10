@@ -137,7 +137,7 @@ async function startAiPractice(type = 'mixed') {
     state.index = 0;
     state.answers = [];
     state.explanations = [];
-    openWorkspace(type === 'reading' ? 'Reading trail · AI practice' : type === 'vocabulary' ? 'Vocabulary lab · AI practice' : 'Personal path · AI practice', data.title || 'Six questions made for you');
+    openWorkspace(type === 'reading' ? 'Reading' : type === 'vocabulary' ? 'Vocabulary' : 'Practice set', data.title || 'Questions');
     renderAiQuestion();
   } catch (error) {
     $('#question-count').textContent = 'Needs attention';
@@ -170,6 +170,26 @@ function finishAiPractice() {
   $('#review-button').addEventListener('click', () => { state.chatContext = `The student just completed a connected six-question ${state.practiceType || 'personal'} practice. Here is the review:\n${review}\nHelp the student notice patterns and choose what to practice next.`; openChat(); });
   $('#again-button').addEventListener('click', () => startAiPractice(state.practiceType));
 }
-function renderPracticeQuestion(type) { const question = state.questions[state.index]; $('#question-count').textContent = `${state.index + 1} / ${state.questions.length}`; $('#workspace-content').innerHTML = `${type === 'reading' ? `<div class="result"><p>${readingItem.passage}</p></div>` : ''}<div class="question"><h3>${question.prompt}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${choice}</button>`).join('')}</div><div class="action-row"><span class="small-note">Select one answer.</span><button class="primary" id="next-question" disabled>${state.index === state.questions.length - 1 ? 'Finish' : 'Next'} <span>→</span></button></div></div>`; let selected = null; document.querySelectorAll('[data-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-choice]').forEach((item) => item.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.choice); $('#next-question').disabled = false; })); $('#next-question').addEventListener('click', () => { state.answers.push(selected); state.index += 1; if (state.index < state.questions.length) renderPracticeQuestion(type); else { const score = Math.round((state.answers.filter((answer, index) => answer === state.questions[index].answer).length / state.questions.length) * 100); window.progressStore.saveProgress(type === 'vocabulary' ? { vocabularyScore: score } : { readingScore: score }); renderProgress(); openWorkspace(type === 'vocabulary' ? 'Vocabulary' : 'Reading', 'Result'); $('#question-count').textContent = 'Complete'; $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>Review the questions or continue with another activity.</p></div>`; } }); }
+function showProgressPage() {
+  const progress = window.progressStore.loadProgress();
+  $('#home-content').classList.add('hidden');
+  openWorkspace('Progress', 'Results');
+  $('#question-count').textContent = 'Saved here';
+  $('#workspace-content').innerHTML = `<div class="result"><h3>${progress.latestLevel}</h3><p>Sessions: ${progress.sessions}</p><p>Vocabulary: ${progress.vocabularyScore == null ? 'Not started' : `${progress.vocabularyScore}%`}</p><p>Reading: ${progress.readingScore == null ? 'Not started' : `${progress.readingScore}%`}</p></div>`;
+}
 
-$('#start-button').addEventListener('click', startAssessment); $('#path-link').addEventListener('click', () => startAiPractice('mixed')); $('#refresh-status').addEventListener('click', refreshStatus); document.querySelectorAll('[data-practice]').forEach((button) => button.addEventListener('click', () => startPractice(button.dataset.practice))); renderProgress(); refreshStatus();
+function showPage(page) {
+  document.querySelectorAll('.top-tab').forEach((button) => button.classList.toggle('active', button.dataset.page === page));
+  if (page === 'home') { $('#home-content').classList.remove('hidden'); $('#workspace').classList.add('hidden'); return; }
+  $('#home-content').classList.add('hidden');
+  if (page === 'vocabulary') return startAiPractice('vocabulary');
+  if (page === 'reading') return startAiPractice('reading');
+  if (page === 'practice') return startAiPractice('mixed');
+  if (page === 'questions') return openChat();
+  if (page === 'progress') return showProgressPage();
+}
+
+document.querySelectorAll('.top-tab').forEach((button) => button.addEventListener('click', () => showPage(button.dataset.page)));
+$('#refresh-status').addEventListener('click', refreshStatus);
+document.querySelectorAll('[data-practice]').forEach((button) => button.addEventListener('click', () => showPage(button.dataset.practice === 'ai' ? 'practice' : button.dataset.practice === 'chat' ? 'questions' : button.dataset.practice)));
+renderProgress(); refreshStatus();

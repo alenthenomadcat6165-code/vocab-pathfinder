@@ -9,19 +9,18 @@
   <body>
     <header class="topbar">
       <a class="brand" href="#top"><span class="brand-mark">✦</span> Vocab Pathfinder</a>
-      <button class="path-link" id="path-link" style="margin-left:auto;margin-right:18px;border:0;background:transparent;color:#c85c36;font-size:13px;font-weight:750;text-decoration:underline">My progress</button>
+      <nav class="top-tabs" aria-label="Practice sections">
+        <button class="top-tab active" data-page="home">Home</button>
+        <button class="top-tab" data-page="vocabulary">Vocabulary</button>
+        <button class="top-tab" data-page="reading">Reading</button>
+        <button class="top-tab" data-page="practice">Practice</button>
+        <button class="top-tab" data-page="questions">Questions</button>
+        <button class="top-tab" data-page="progress">Progress</button>
+      </nav>
     </header>
 
     <main id="top" class="shell">
-      <section class="hero">
-        <div>
-          <p class="eyebrow">English practice</p>
-          <p class="hero-copy">Short assessments and practice questions for vocabulary, reading, spelling, and grammar.</p>
-          <button class="primary" id="start-button">Begin assessment <span>→</span></button>
-        </div>
-        <div class="hero-art" aria-hidden="true"><div class="sun"></div><div class="path-line"></div><div class="mountain mountain-one"></div><div class="mountain mountain-two"></div><div class="flag">✦</div></div>
-      </section>
-
+      <div id="home-content">
       <section class="status-row" aria-label="Practice support status">
         <span class="status-dot" id="status-dot"></span><span id="ollama-status">Checking assistant status…</span>
         <button class="text-button" id="refresh-status">Refresh</button>
@@ -33,7 +32,7 @@
           <div class="level-card"><span>Current level</span><strong id="current-level">Not measured yet</strong><small id="session-count">0 learning sessions</small></div>
           <div class="skill-list"><div><span>Vocabulary</span><b id="vocab-score">Not started</b></div><div><span>Reading</span><b id="reading-score">Not started</b></div><div><span>Assessment</span><b id="path-score">Not assessed</b></div></div>
         </article>
-        <article class="panel why-panel"><p class="eyebrow">Assessment</p><h2>Two parts, one estimate.</h2><p>The assessment covers several English skills, then uses a shorter set of questions to estimate a starting level.</p></article>
+        <article class="panel why-panel"><p class="eyebrow">Overview</p><h2>Practice sections</h2><p>Choose a section from the top menu.</p></article>
       </section>
 
       <section id="workspace" class="workspace panel hidden">
@@ -47,6 +46,7 @@
         <article class="practice-card"><span class="card-number">03</span><h3>Practice set</h3><p>Six questions based on the current level.</p><button class="secondary" data-practice="ai">Open →</button></article>
         <article class="practice-card"><span class="card-number">04</span><h3>Questions</h3><p>Ask about words, sentences, and passages.</p><button class="secondary" data-practice="chat">Open →</button></article>
       </section>
+      </div>
 
       <footer><span>Vocab Pathfinder</span></footer>
     </main>
