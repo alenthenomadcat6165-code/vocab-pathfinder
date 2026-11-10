@@ -13,6 +13,7 @@ const starterProgress = {
   refinedScore: null,
   vocabularyScore: null,
   readingScore: null,
+  vocabUnlocked: 1,
   lastActivity: null
 };
 

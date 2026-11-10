@@ -21,6 +21,8 @@
 - Existing browser progress was cleared once on November 9, 2026.
 - Vocabulary has a clickable word path, Reading has sample books with read-aloud recognition, AI feedback, and questions, and Practice generates a six-question skill test.
 - Questions can answer website-use questions and other harmless questions as a general assistant.
+- Vocabulary lessons are sequential: each lesson has six questions, and completing one unlocks the next dot.
+- Reading books appear in two columns on larger screens and one column on phones.
 - Vocabulary now has 110 spaced vertical path dots, and Reading now has 20 sample passages.
 - Vocabulary quizzes, reading practice, and progress tracking work in the browser.
 - The backend sends requests to local Ollama at `http://127.0.0.1:11434` using `gemma3:1b`.

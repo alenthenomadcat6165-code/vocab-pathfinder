@@ -169,15 +169,14 @@ function sendChat(event) { event.preventDefault(); const input = $('#chat-input'
 function showVocabularyPage() {
   openWorkspace('Vocabulary', 'Word path');
   $('#question-count').textContent = `${vocabularyPath.length} words`;
-  $('#workspace-content').innerHTML = `<p class="muted">Select a dot to open its lesson.</p><div class="word-path">${vocabularyPath.map((item, index) => `<button class="word-dot" data-word-index="${index}" aria-label="${item.word}">${index + 1}</button>`).join('')}</div><div id="word-detail" class="result"></div>`;
-  document.querySelectorAll('[data-word-index]').forEach((button) => button.addEventListener('click', () => renderVocabularyLesson(Number(button.dataset.wordIndex))));
-  renderVocabularyLesson(0);
+  const unlocked = window.progressStore.loadProgress().vocabUnlocked || 1;
+  $('#workspace-content').innerHTML = `<p class="muted">Complete each lesson to open the next dot.</p><div class="word-path">${vocabularyPath.map((item, index) => `<button class="word-dot ${index < unlocked ? '' : 'locked'}" data-word-index="${index}" aria-label="${index < unlocked ? item.word : 'Locked lesson'}">${index < unlocked ? index + 1 : '🔒'}</button>`).join('')}</div>`;
+  document.querySelectorAll('[data-word-index]').forEach((button) => button.addEventListener('click', () => { const index = Number(button.dataset.wordIndex); if (index < unlocked) openVocabularyLesson(index); }));
 }
 
-function renderVocabularyLesson(index) {
-  const item = vocabularyPath[index];
-  const otherWords = vocabularyPath.filter((_, itemIndex) => itemIndex !== index).slice(0, 5).map((entry) => entry.meaning);
-  const questions = [
+function vocabularyQuestions(item) {
+  const otherWords = vocabularyPath.filter((entry) => entry.word !== item.word).slice(0, 5).map((entry) => entry.meaning);
+  return [
     { prompt: `What does “${item.word}” mean?`, choices: [item.meaning, ...otherWords.slice(0, 3)], answer: 0 },
     { prompt: `Which sentence uses “${item.word}” correctly?`, choices: [item.example, `The ${item.word} was a color of the sky.`, `I ${item.word} the sandwich quickly.`, `The word ${item.word} means yesterday.`], answer: 0 },
     { prompt: `What skill does this lesson practice?`, choices: [item.skill, 'Drawing maps', 'Measuring distance', 'Playing an instrument'], answer: 0 },
@@ -185,9 +184,27 @@ function renderVocabularyLesson(index) {
     { prompt: `Which is closest to the meaning of “${item.word}”?`, choices: [item.meaning, ...otherWords.slice(1, 4)], answer: 0 },
     { prompt: `What should you do after learning “${item.word}”?`, choices: ['Use it in your own sentence', 'Forget the example', 'Skip every question', 'Change the word randomly'], answer: 0 }
   ];
-  $('#word-detail').innerHTML = `<div class="lesson-heading"><small>Lesson ${index + 1} of ${vocabularyPath.length}</small><h3>${item.word}</h3><p>${item.meaning}</p><p><strong>Example:</strong> ${item.example}</p></div><div class="vocab-questions">${questions.map((question, questionIndex) => `<div class="vocab-question"><p><strong>${questionIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-vocab-question="${questionIndex}" data-vocab-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div>`).join('')}</div><div class="action-row"><button class="primary" id="check-vocab">Check lesson</button><span id="vocab-score" class="small-note"></span></div>`;
-  document.querySelectorAll('[data-vocab-question]').forEach((button) => button.addEventListener('click', () => { const questionIndex = Number(button.dataset.vocabQuestion); document.querySelectorAll(`[data-vocab-question="${questionIndex}"]`).forEach((choice) => choice.classList.remove('selected')); button.classList.add('selected'); }));
-  $('#check-vocab').addEventListener('click', () => { const score = questions.reduce((total, question, questionIndex) => total + (Number(document.querySelector(`[data-vocab-question="${questionIndex}"].selected`)?.dataset.vocabChoice) === question.answer ? 1 : 0), 0); $('#vocab-score').textContent = `${score} / ${questions.length} correct`; });
+}
+
+function openVocabularyLesson(index) {
+  const item = vocabularyPath[index];
+  state.vocabLessonIndex = index;
+  state.vocabQuestions = vocabularyQuestions(item);
+  state.vocabQuestionIndex = 0;
+  state.vocabAnswers = [];
+  openWorkspace('Vocabulary lesson', item.word);
+  renderVocabularyQuestion();
+}
+
+function renderVocabularyQuestion() {
+  const item = vocabularyPath[state.vocabLessonIndex];
+  const question = state.vocabQuestions[state.vocabQuestionIndex];
+  $('#question-count').textContent = `${state.vocabQuestionIndex + 1} / 6`;
+  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>Lesson ${state.vocabLessonIndex + 1} of ${vocabularyPath.length}</small><h3>${item.word}</h3><p>${item.meaning}</p><p><strong>Example:</strong> ${item.example}</p></div><div class="vocab-question"><p><strong>${state.vocabQuestionIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-vocab-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div><div class="action-row"><button class="secondary" id="back-to-path">Back to path</button><button class="primary" id="next-vocab" disabled>${state.vocabQuestionIndex === 5 ? 'Finish lesson' : 'Next'} <span>→</span></button></div>`;
+  let selected = null;
+  document.querySelectorAll('[data-vocab-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-vocab-choice]').forEach((choice) => choice.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.vocabChoice); $('#next-vocab').disabled = false; }));
+  $('#back-to-path').addEventListener('click', showVocabularyPage);
+  $('#next-vocab').addEventListener('click', () => { state.vocabAnswers.push(selected); if (state.vocabQuestionIndex < 5) { state.vocabQuestionIndex += 1; renderVocabularyQuestion(); } else { const progress = window.progressStore.loadProgress(); window.progressStore.saveProgress({ vocabUnlocked: Math.max(progress.vocabUnlocked || 1, state.vocabLessonIndex + 2) }); openWorkspace('Vocabulary lesson', 'Lesson complete'); $('#question-count').textContent = 'Complete'; $('#workspace-content').innerHTML = `<div class="result"><h3>${item.word}</h3><p>Lesson complete. The next dot is now available.</p><button class="primary" id="continue-vocab">Return to path <span>→</span></button></div>`; $('#continue-vocab').addEventListener('click', showVocabularyPage); } });
 }
 
 function showReadingPage() {
