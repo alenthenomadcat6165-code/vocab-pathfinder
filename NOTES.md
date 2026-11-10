@@ -19,6 +19,8 @@
 - The guide can follow the current practice question and keep the last few chat turns connected for review.
 - Vocabulary, Reading, Practice, Questions, and Progress are separate sections with fixed top navigation.
 - Existing browser progress was cleared once on November 9, 2026.
+- Vocabulary has a clickable word path, Reading has sample books with read-aloud recognition, AI feedback, and questions, and Practice generates a six-question skill test.
+- Questions can answer website-use questions and other harmless questions as a general assistant.
 - Vocabulary quizzes, reading practice, and progress tracking work in the browser.
 - The backend sends requests to local Ollama at `http://127.0.0.1:11434` using `gemma3:1b`.
 - The AI receives the project safety and teaching instructions from `BRIEF.md` with every message.

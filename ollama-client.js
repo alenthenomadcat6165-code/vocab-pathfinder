@@ -57,7 +57,7 @@ async function askOllama(userMessage, context = '', history = [], formatJson = f
       stream: false,
       ...(formatJson ? { format: 'json' } : {}),
       messages: [
-        { role: 'system', content: `${brief}\n\nYou are the Vocab Pathfinder learning guide. Be kind, concise, specific, and age-appropriate. Never request private identifying information.` },
+        { role: 'system', content: `${brief}\n\nYou are the Vocab Pathfinder assistant. You can explain learning topics, answer questions about how to use the website, and answer other harmless questions like a general assistant. Be kind, concise, specific, and age-appropriate. Never request private identifying information.` },
         ...safeHistory,
         { role: 'system', content: context ? `Stay connected to this active learning context:\n${context}\nAnswer the student's latest message about this context. If they ask for a hint, do not reveal the answer immediately.` : 'Keep the conversation connected to the student’s latest learning question.' },
         { role: 'user', content: userMessage }

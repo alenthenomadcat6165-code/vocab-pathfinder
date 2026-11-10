@@ -23,8 +23,21 @@ const vocabularyItems = [
   { word: 'fortunate', meaning: 'having good luck', choices: ['having good luck', 'feeling tired', 'being uncertain', 'moving quickly'], answer: 0 }
 ];
 const readingItem = { passage: 'Jordan noticed that the library was quieter than usual. Instead of rushing through the assignment, Jordan made a short plan, looked up two unfamiliar words, and asked for help with the hardest paragraph. By the end, the chapter felt less confusing.', question: 'Why did the chapter feel less confusing?', choices: ['Jordan skipped it.', 'Jordan used a plan and asked for help.', 'The library became louder.', 'The words disappeared.'], answer: 1 };
+const vocabularyPath = [
+  { word: 'observe', meaning: 'to watch or notice carefully', example: 'Scientists observe changes in plants.', skill: 'Finding meaning from context' },
+  { word: 'adapt', meaning: 'to change so something works in a new situation', example: 'Animals adapt to their environment.', skill: 'Using a word in a sentence' },
+  { word: 'contrast', meaning: 'a clear difference between two things', example: 'The author contrasts the two characters.', skill: 'Comparing ideas' },
+  { word: 'reluctant', meaning: 'not ready or willing to do something', example: 'Mia was reluctant to speak first.', skill: 'Understanding tone' },
+  { word: 'precise', meaning: 'exact and careful', example: 'Use precise words to explain your idea.', skill: 'Choosing exact words' },
+  { word: 'fortunate', meaning: 'having good luck', example: 'We were fortunate to find the lost book.', skill: 'Recognizing synonyms' }
+];
+const readingBooks = [
+  { title: 'The Library Window', author: 'Sample passage', passage: 'Jordan noticed that the library was quieter than usual. Instead of rushing through the assignment, Jordan made a short plan, looked up two unfamiliar words, and asked for help with the hardest paragraph. By the end, the chapter felt less confusing.', questions: [{ prompt: 'Why did the chapter feel less confusing?', choices: ['Jordan skipped it.', 'Jordan used a plan and asked for help.', 'The library became louder.', 'The words disappeared.'], answer: 1 }, { prompt: 'What does “unfamiliar” mean here?', choices: ['Not known yet', 'Very loud', 'Already finished', 'Easy to carry'], answer: 0 }] },
+  { title: 'A Small Change', author: 'Sample passage', passage: 'Every afternoon, Lena placed a bowl of water near the garden. At first, only a few birds visited. After several days, more birds arrived, and Lena began writing down their colors and songs. Her small habit helped her notice details she had missed before.', questions: [{ prompt: 'What did Lena’s habit help her do?', choices: ['Notice more details', 'Close the garden', 'Forget the birds', 'Make the afternoons shorter'], answer: 0 }, { prompt: 'What is the main idea?', choices: ['Small repeated actions can lead to new observations.', 'Birds only visit in winter.', 'Writing is always difficult.', 'Gardens should have no water.'], answer: 0 }] }
+];
 
 let state = { mode: null, questions: [], index: 0, answers: [], level: 'Not measured yet', chatMessages: [] };
+let speechRecognition = null;
 const $ = (selector) => document.querySelector(selector);
 const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:3000' : '';
 
@@ -117,17 +130,56 @@ async function sendMessage(message) {
 function addBubble(kind, text) { const log = $('#chat-log'); if (!log) return; const bubble = document.createElement('div'); bubble.className = `bubble ${kind}`; bubble.textContent = text; log.appendChild(bubble); log.scrollTop = log.scrollHeight; }
 function sendChat(event) { event.preventDefault(); const input = $('#chat-input'); const message = input.value.trim(); if (!message) return; input.value = ''; sendMessage(message); }
 
+function showVocabularyPage() {
+  openWorkspace('Vocabulary', 'Word path');
+  $('#question-count').textContent = `${vocabularyPath.length} words`;
+  $('#workspace-content').innerHTML = `<p class="muted">Select a point on the path.</p><div class="word-path">${vocabularyPath.map((item, index) => `<button class="word-dot" data-word-index="${index}" aria-label="${item.word}">${index + 1}</button>`).join('')}</div><div id="word-detail" class="result"><h3>${vocabularyPath[0].word}</h3><p>${vocabularyPath[0].meaning}</p><p><strong>Example:</strong> ${vocabularyPath[0].example}</p><small>${vocabularyPath[0].skill}</small></div>`;
+  document.querySelectorAll('[data-word-index]').forEach((button) => button.addEventListener('click', () => { const item = vocabularyPath[Number(button.dataset.wordIndex)]; $('#word-detail').innerHTML = `<h3>${item.word}</h3><p>${item.meaning}</p><p><strong>Example:</strong> ${item.example}</p><small>${item.skill}</small>`; }));
+}
+
+function showReadingPage() {
+  openWorkspace('Reading', 'Books');
+  $('#question-count').textContent = `${readingBooks.length} books`;
+  $('#workspace-content').innerHTML = `<p class="muted">Choose a passage.</p><div class="book-list">${readingBooks.map((book, index) => `<button class="book-item" data-book-index="${index}"><strong>${book.title}</strong><span>${book.author}</span></button>`).join('')}</div>`;
+  document.querySelectorAll('[data-book-index]').forEach((button) => button.addEventListener('click', () => openBook(Number(button.dataset.bookIndex))));
+}
+
+function openBook(index) {
+  const book = readingBooks[index];
+  state.currentBook = book;
+  state.readingTranscript = '';
+  openWorkspace('Reading', book.title);
+  $('#question-count').textContent = 'Read aloud';
+  $('#workspace-content').innerHTML = `<article class="book-page"><p>${book.passage}</p></article><div class="reading-tools"><button class="primary" id="start-reading">Start reading aloud</button><button class="secondary" id="stop-reading" disabled>Stop</button><span id="speech-status" class="small-note">No recording</span></div><div class="result"><h3>Transcript</h3><p id="reading-transcript">Your spoken words will appear here.</p><button class="secondary" id="rate-reading" disabled>Rate reading</button><p id="reading-feedback" class="small-note"></p></div><div class="result"><h3>Questions</h3><div id="book-questions">${book.questions.map((question, qIndex) => `<div class="book-question"><p><strong>${qIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-book-question="${qIndex}" data-book-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div>`).join('')}</div><div class="action-row"><button class="primary" id="check-book">Check answers</button><span id="book-score" class="small-note"></span></div></div>`;
+  document.querySelectorAll('[data-book-question]').forEach((button) => button.addEventListener('click', () => { const qIndex = Number(button.dataset.bookQuestion); document.querySelectorAll(`[data-book-question="${qIndex}"]`).forEach((item) => item.classList.remove('selected')); button.classList.add('selected'); }));
+  $('#start-reading').addEventListener('click', startReadingAloud); $('#stop-reading').addEventListener('click', stopReadingAloud); $('#rate-reading').addEventListener('click', rateReading); $('#check-book').addEventListener('click', () => { const score = book.questions.reduce((total, question, qIndex) => total + (Number(document.querySelector(`[data-book-question="${qIndex}"].selected`)?.dataset.bookChoice) === question.answer ? 1 : 0), 0); $('#book-score').textContent = `${score} / ${book.questions.length} correct`; });
+}
+
+function startReadingAloud() {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) { $('#speech-status').textContent = 'Speech recognition is not available in this browser.'; return; }
+  const recognition = new Recognition(); speechRecognition = recognition; recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'en-US';
+  recognition.onstart = () => { $('#speech-status').textContent = 'Listening'; $('#start-reading').disabled = true; $('#stop-reading').disabled = false; };
+  recognition.onresult = (event) => { state.readingTranscript = Array.from(event.results).map((result) => result[0].transcript).join(' '); $('#reading-transcript').textContent = state.readingTranscript; $('#rate-reading').disabled = !state.readingTranscript.trim(); };
+  recognition.onerror = () => { $('#speech-status').textContent = 'Speech recognition stopped.'; $('#start-reading').disabled = false; $('#stop-reading').disabled = true; };
+  recognition.onend = () => { $('#speech-status').textContent = state.readingTranscript ? 'Transcript ready' : 'No recording'; $('#start-reading').disabled = false; $('#stop-reading').disabled = true; };
+  recognition.start();
+}
+
+function stopReadingAloud() { if (speechRecognition) speechRecognition.stop(); }
+async function rateReading() { const feedback = $('#reading-feedback'); feedback.textContent = 'Rating…'; $('#rate-reading').disabled = true; try { const response = await fetch(`${API_BASE}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Rate this read-aloud transcript for a middle-school English learner. Give a short, kind score from 1 to 5 for fluency and one specific next practice tip.', context: `Book passage: ${state.currentBook.passage}\nStudent transcript: ${state.readingTranscript}` }) }); const data = await response.json(); feedback.textContent = data.answer || data.error || 'No rating available.'; } catch { feedback.textContent = 'The reading rating is unavailable.'; } finally { $('#rate-reading').disabled = false; } }
+
 async function startAiPractice(type = 'mixed') {
   if (type === 'ai') type = 'mixed';
   const progress = window.progressStore.loadProgress();
-  if (progress.latestLevel === 'Not measured yet') return startAssessment();
+  if (type !== 'test' && progress.latestLevel === 'Not measured yet') return startAssessment();
   state.mode = 'ai-practice';
   state.practiceType = type;
   openWorkspace('Practice set', 'Generating questions');
   $('#question-count').textContent = 'Thinking…';
   $('#workspace-content').innerHTML = '<div class="result"><h3>Generating questions.</h3><p>Six multiple-choice questions are being prepared.</p></div>';
   try {
-    const response = await fetch(`${API_BASE}/api/practice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: progress.latestLevel, type }) });
+    const response = await fetch(`${API_BASE}/api/practice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: type === 'test' ? 'Not assessed yet' : progress.latestLevel, type: type === 'test' ? 'mixed' : type }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'The AI could not make practice right now.');
     state.questions = data.questions;
@@ -158,7 +210,7 @@ function renderAiQuestion() {
 function finishAiPractice() {
   const score = Math.round((state.answers.filter((answer, index) => answer === state.questions[index].answer).length / 6) * 100);
   const progress = window.progressStore.loadProgress();
-  const changes = state.practiceType === 'vocabulary' ? { vocabularyScore: score } : state.practiceType === 'reading' ? { readingScore: score } : {};
+  const changes = state.practiceType === 'vocabulary' ? { vocabularyScore: score } : state.practiceType === 'reading' ? { readingScore: score } : state.practiceType === 'test' ? { assessmentScore: score, latestLevel: levelFor(score), sessions: progress.sessions + 1 } : {};
   window.progressStore.saveProgress(changes);
   renderProgress();
   openWorkspace('Practice result', 'Score');
@@ -180,9 +232,9 @@ function showPage(page) {
   document.querySelectorAll('.top-tab').forEach((button) => button.classList.toggle('active', button.dataset.page === page));
   if (page === 'home') { $('#home-content').classList.remove('hidden'); $('#workspace').classList.add('hidden'); return; }
   $('#home-content').classList.add('hidden');
-  if (page === 'vocabulary') return startAiPractice('vocabulary');
-  if (page === 'reading') return startAiPractice('reading');
-  if (page === 'practice') return startAiPractice('mixed');
+  if (page === 'vocabulary') return showVocabularyPage();
+  if (page === 'reading') return showReadingPage();
+  if (page === 'practice') return startAiPractice('test');
   if (page === 'questions') return openChat();
   if (page === 'progress') return showProgressPage();
 }
