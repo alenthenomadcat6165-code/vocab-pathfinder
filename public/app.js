@@ -175,14 +175,17 @@ function showVocabularyPage() {
 }
 
 function vocabularyQuestions(item) {
-  const otherWords = vocabularyPath.filter((entry) => entry.word !== item.word).slice(0, 5).map((entry) => entry.meaning);
+  const meaningSentence = `The student used “${item.word}” in a sentence about ${item.meaning}.`;
+  const oppositeSentence = `The student used “${item.word}” to mean the opposite of ${item.meaning}.`;
+  const unrelatedSentence = `The student used “${item.word}” as the name of a color.`;
+  const timeSentence = `The student used “${item.word}” to mean yesterday.`;
   return [
-    { prompt: `What does “${item.word}” mean?`, choices: [item.meaning, ...otherWords.slice(0, 3)], answer: 0 },
-    { prompt: `Which sentence uses “${item.word}” correctly?`, choices: [item.word === 'observe' ? 'The scientist observed the bird from the window.' : `The word “${item.word}” is used in a sentence that matches its meaning.`, `The ${item.word} was a color of the sky.`, `The word ${item.word} means yesterday.`, `I put the word ${item.word} inside a box.`], answer: 0 },
-    { prompt: `What skill does this lesson practice?`, choices: [item.skill, 'Drawing maps', 'Measuring distance', 'Playing an instrument'], answer: 0 },
-    { prompt: `Which clue would help you understand “${item.word}”?`, choices: ['The words around it in a sentence', 'The number of letters only', 'The color of the page', 'The time of day'], answer: 0 },
-    { prompt: `Which is closest to the meaning of “${item.word}”?`, choices: [item.meaning, ...otherWords.slice(1, 4)], answer: 0 },
-    { prompt: `What should you do after learning “${item.word}”?`, choices: ['Use it in your own sentence', 'Forget the example', 'Skip every question', 'Change the word randomly'], answer: 0 }
+    { prompt: `Which sentence uses “${item.word}” correctly?`, choices: [meaningSentence, oppositeSentence, unrelatedSentence, timeSentence], answer: 0 },
+    { prompt: `Which sentence gives the best clue to the meaning of “${item.word}”?`, choices: [meaningSentence, `The student placed “${item.word}” beside a drawing of a rainbow.`, `The student wrote “${item.word}” on a clock.`, `The student heard “${item.word}” during a song.`], answer: 0 },
+    { prompt: `Which sentence explains what “${item.word}” means?`, choices: [meaningSentence, `The sentence says that “${item.word}” is a kind of sandwich.`, `The sentence says that “${item.word}” is a number.`, `The sentence says that “${item.word}” is a place to sleep.`], answer: 0 },
+    { prompt: `Which sentence would help a reader understand “${item.word}”?`, choices: [meaningSentence, `The reader counted the letters in “${item.word}” but did not read the sentence.`, `The reader looked only at the color of the page.`, `The reader closed the book before seeing “${item.word}”.`], answer: 0 },
+    { prompt: `Which sentence has the closest meaning to “${item.word}”?`, choices: [meaningSentence, oppositeSentence, unrelatedSentence, timeSentence], answer: 0 },
+    { prompt: `Which sentence shows a good way to learn “${item.word}”?`, choices: [`The student wrote a new sentence using “${item.word}” and its meaning.`, `The student skipped the example and guessed every answer.`, `The student erased “${item.word}” before reading it.`, `The student changed “${item.word}” into a random number.`], answer: 0 }
   ];
 }
 
@@ -204,7 +207,7 @@ function renderVocabularyQuestion() {
   const item = vocabularyPath[state.vocabLessonIndex];
   const question = state.vocabQuestions[state.vocabQuestionIndex];
   $('#question-count').textContent = `${state.vocabQuestionIndex + 1} / 6`;
-  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>Lesson ${state.vocabLessonIndex + 1} · Question ${state.vocabQuestionIndex + 1} of 6</small><h3>${item.word}</h3></div><div class="vocab-question"><p><strong>${state.vocabQuestionIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-vocab-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div><div class="action-row"><button class="secondary" id="back-to-path">Back to path</button><button class="primary" id="next-vocab" disabled>${state.vocabQuestionIndex === 5 ? 'Finish lesson' : 'Next'} <span>→</span></button></div>`;
+  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>Lesson ${state.vocabLessonIndex + 1} · Question ${state.vocabQuestionIndex + 1} of 6</small><h3>Practice question</h3></div><div class="vocab-question"><p><strong>${state.vocabQuestionIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-vocab-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div><div class="action-row"><button class="secondary" id="back-to-path">Back to path</button><button class="primary" id="next-vocab" disabled>${state.vocabQuestionIndex === 5 ? 'Finish lesson' : 'Next'} <span>→</span></button></div>`;
   let selected = null;
   document.querySelectorAll('[data-vocab-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-vocab-choice]').forEach((choice) => choice.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.vocabChoice); $('#next-vocab').disabled = false; }));
   $('#back-to-path').addEventListener('click', showVocabularyPage);
