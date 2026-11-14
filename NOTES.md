@@ -32,6 +32,10 @@
 - The AI receives the project safety and teaching instructions from `BRIEF.md` with every message.
 - Ollama requests stay on the backend; no OpenAI key is needed.
 - Saves on this computer only for now.
+- Vercel setup: the `api/index.js` Vercel Function serves `/api/health`, `/api/ai`, and `/api/practice`; the existing `public/` files are served as the website.
+- Online AI uses the server-only `OPENAI_API_KEY` environment variable. `OPENAI_MODEL` is optional and defaults to `gpt-4o-mini`.
+- Local development still uses the existing Ollama server and `OLLAMA_BASE_URL`/`OLLAMA_MODEL` settings.
+- To deploy, import this GitHub repository into Vercel, keep the framework preset as Other, and add `OPENAI_API_KEY` under Project Settings → Environment Variables for the environments you use. Do not add the key to `.env`, Git, or browser code.
 
 ## Maybe Later
 
