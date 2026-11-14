@@ -15,6 +15,7 @@
 - Version 1 has a two-step English check, with vocabulary, grammar, spelling, and reading questions.
 - It gives an estimated level and opens a kind, local AI learning guide.
 - The local AI creates six multiple-choice questions for each practice set; students choose answers instead of typing to a chatbot.
+- Practice starts from a setup screen, reviews missed questions with the correct answers, and remembers missed skills for targeted future sets.
 - An optional AI chat is also available for explanations and learning questions.
 - The guide can follow the current practice question and keep the last few chat turns connected for review.
 - Vocabulary, Reading, Practice, Questions, and Progress are separate sections with fixed top navigation.

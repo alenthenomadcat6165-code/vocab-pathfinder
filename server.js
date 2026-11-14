@@ -74,7 +74,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = JSON.parse(await readBody(req));
       if (!body.level || !body.type) return sendJson(res, 400, { error: 'A level and practice type are needed.' });
-      const practice = await createPractice({ level: String(body.level), type: String(body.type) });
+      const practice = await createPractice({ level: String(body.level), type: String(body.type), weakSkills: body.weakSkills || {} });
       return sendJson(res, 200, practice);
     } catch (error) {
       const status = error.code === 'OLLAMA_OFFLINE' ? 503 : 500;

@@ -272,7 +272,7 @@ async function startAiPractice(type = 'mixed') {
   $('#question-count').textContent = 'Thinking…';
   $('#workspace-content').innerHTML = '<div class="result"><h3>Generating questions.</h3><p>Six multiple-choice questions are being prepared.</p></div>';
   try {
-    const response = await fetch(`${API_BASE}/api/practice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: type === 'test' ? 'Not assessed yet' : progress.latestLevel, type: type === 'test' ? 'mixed' : type }) });
+    const response = await fetch(`${API_BASE}/api/practice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: type === 'test' ? 'Not assessed yet' : progress.latestLevel, type: type === 'test' ? 'mixed' : type, weakSkills: progress.weakSkills || {} }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'The AI could not make practice right now.');
     state.questions = data.questions;
@@ -303,15 +303,27 @@ function renderAiQuestion() {
 function finishAiPractice() {
   const score = Math.round((state.answers.filter((answer, index) => answer === state.questions[index].answer).length / 6) * 100);
   const progress = window.progressStore.loadProgress();
-  const changes = state.practiceType === 'vocabulary' ? { vocabularyScore: score } : state.practiceType === 'reading' ? { readingScore: score } : state.practiceType === 'test' ? { assessmentScore: score, latestLevel: levelFor(score), sessions: progress.sessions + 1 } : {};
+  const weakSkills = { ...(progress.weakSkills || {}) };
+  state.questions.forEach((question, index) => { if (state.answers[index] !== question.answer) { const skill = question.skill || state.practiceType || 'General English'; weakSkills[skill] = (weakSkills[skill] || 0) + 1; } });
+  const changes = state.practiceType === 'vocabulary' ? { vocabularyScore: score, weakSkills } : state.practiceType === 'reading' ? { readingScore: score, weakSkills } : state.practiceType === 'test' ? { assessmentScore: score, latestLevel: levelFor(score), sessions: progress.sessions + 1, weakSkills } : { weakSkills };
   window.progressStore.saveProgress(changes);
   renderProgress();
   openWorkspace('Practice result', 'Score');
   $('#question-count').textContent = 'Complete';
   const review = state.questions.map((question, index) => `Q${index + 1}: ${question.prompt} Student choice: ${question.choices[state.answers[index]] || 'none'}. Correct choice: ${question.choices[question.answer]}.`).join('\n');
-  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>Review the questions or generate another set.</p><div class="action-row"><button class="secondary" id="review-button">Review with assistant →</button><button class="secondary" id="again-button">Generate another set →</button></div></div>`;
+  const missed = state.questions.map((question, index) => ({ question, index })).filter(({ question, index }) => state.answers[index] !== question.answer);
+  const reviewItems = missed.length ? missed.map(({ question, index }) => `<div class="review-item"><strong>Question ${index + 1}</strong><p>${question.prompt}</p><p class="wrong-answer">Your answer: ${question.choices[state.answers[index]] || 'No answer'}</p><p class="right-answer">Right answer: ${question.choices[question.answer]}</p><p>${question.explanation}</p></div>`).join('') : '<p>All six answers were correct.</p>';
+  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${state.answers.filter((answer, index) => answer === state.questions[index].answer).length} out of ${state.questions.length}.</p><h3>Review</h3><div class="review-list">${reviewItems}</div><div class="action-row"><button class="secondary" id="review-button">Review with assistant →</button><button class="secondary" id="again-button">Generate another set →</button></div></div>`;
   $('#review-button').addEventListener('click', () => { state.chatContext = `The student just completed a connected six-question ${state.practiceType || 'personal'} practice. Here is the review:\n${review}\nHelp the student notice patterns and choose what to practice next.`; openChat(); });
   $('#again-button').addEventListener('click', () => startAiPractice(state.practiceType));
+}
+function showPracticePage() {
+  const progress = window.progressStore.loadProgress();
+  openWorkspace('Practice', 'Skill check');
+  $('#question-count').textContent = 'Six questions';
+  const focus = Object.entries(progress.weakSkills || {}).sort((a, b) => b[1] - a[1])[0]?.[0];
+  $('#workspace-content').innerHTML = `<div class="result"><h3>Practice test</h3><p>Six different questions will check vocabulary, reading, spelling, and grammar. ${focus ? `Recent mistakes will give extra practice to ${focus}.` : ''}</p><button class="primary" id="generate-test">Generate test <span>→</span></button></div>`;
+  $('#generate-test').addEventListener('click', () => startAiPractice('test'));
 }
 function showProgressPage() {
   const progress = window.progressStore.loadProgress();
@@ -327,7 +339,7 @@ function showPage(page) {
   $('#home-content').classList.add('hidden');
   if (page === 'vocabulary') return showVocabularyPage();
   if (page === 'reading') return showReadingPage();
-  if (page === 'practice') return startAiPractice('test');
+  if (page === 'practice') return showPracticePage();
   if (page === 'questions') return openChat();
   if (page === 'progress') return showProgressPage();
 }

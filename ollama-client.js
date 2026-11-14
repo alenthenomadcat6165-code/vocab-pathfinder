@@ -21,7 +21,7 @@ async function ollamaRequest(endpoint, options = {}) {
     return await fetch(`${OLLAMA_BASE_URL}${endpoint}`, {
       ...options,
       headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-      signal: AbortSignal.timeout(30000)
+      signal: AbortSignal.timeout(90000)
     });
   } catch (error) {
     const offline = new Error('Ollama is not running. Start Ollama, then try again.');
@@ -75,10 +75,27 @@ async function askOllama(userMessage, context = '', history = [], formatJson = f
   return data.message?.content || 'I could not make a helpful answer this time. Let’s try again.';
 }
 
-async function createPractice({ level, type }) {
+function fallbackPractice(weakSkills = {}) {
+  const focus = Object.entries(weakSkills).sort((a, b) => Number(b[1]) - Number(a[1]))[0]?.[0];
+  const questions = [
+    { skill: 'Vocabulary', prompt: 'In the sentence “The narrow path was difficult to cross,” what does “narrow” mean?', choices: ['Not wide', 'Very bright', 'Easy to find', 'Full of water'], answer: 0, explanation: 'Narrow means not wide, which fits the description of the path.' },
+    { skill: 'Reading', prompt: 'Maya packed a flashlight before entering the shed. What can the reader infer?', choices: ['The shed may be dark.', 'Maya planned to paint.', 'The shed was full of food.', 'Maya was going swimming.'], answer: 0, explanation: 'A flashlight helps someone see in a dark place.' },
+    { skill: 'Grammar', prompt: 'Which sentence has the correct subject-verb agreement?', choices: ['The group of hikers walks slowly.', 'The group of hikers walk slowly.', 'The group hikers walking slowly.', 'The group of hikers are walks slowly.'], answer: 0, explanation: 'The subject “group” is singular, so “walks” is correct.' },
+    { skill: 'Spelling', prompt: 'Which word completes the sentence? “The scientist recorded the careful ___.”', choices: ['measurement', 'measurment', 'measurmentt', 'measurmentes'], answer: 0, explanation: 'Measurement is the correctly spelled word.' },
+    { skill: 'Reading', prompt: 'A character checks the bus schedule twice before leaving. What does this detail show?', choices: ['The character wants to avoid missing the bus.', 'The character dislikes reading.', 'The bus has already left.', 'The schedule is a storybook.'], answer: 0, explanation: 'Checking the schedule helps the character plan the trip.' },
+    { skill: 'Vocabulary', prompt: 'Which sentence uses “fortunate” in a way that shows its meaning?', choices: ['It was fortunate that the rain stopped before the game.', 'The fortunate pencil was placed under the desk.', 'He fortunate the answer on the page.', 'The word fortunate means extremely noisy.'], answer: 0, explanation: 'Fortunate means lucky, and the sentence describes a lucky event.' }
+  ];
+  if (!focus) return questions;
+  const focused = questions.filter((question) => question.skill.toLowerCase().includes(focus.toLowerCase()));
+  return [...focused, ...questions.filter((question) => !focused.includes(question))].slice(0, 6);
+}
+
+async function createPractice({ level, type, weakSkills = {} }) {
   const focus = type === 'reading' ? 'reading comprehension using one short passage' : type === 'vocabulary' ? 'vocabulary meaning and context' : 'a balanced mix of vocabulary, spelling, grammar, and reading';
-  const prompt = `Create exactly 6 ${focus} multiple-choice problems for a middle-school student at the estimated English level “${level}”. Return ONLY valid JSON with this shape: {"title":"short title","passage":"optional short passage, empty string if not needed","questions":[{"prompt":"question","choices":["choice 1","choice 2","choice 3","choice 4"],"answer":0,"explanation":"short kind explanation"}]}. The answer must be a number from 0 to 3. Make every question clear, age-appropriate, specific, and different. Do not ask the student to type a response. Do not include markdown fences or any text outside the JSON.`;
-  const retryPrompt = `Return a JSON object with exactly 6 questions now. Each question must have a prompt, exactly 4 choices, a numeric answer from 0 to 3, and a short explanation. Topic: ${focus}. Student level: ${level}.`;
+  const weakFocus = Object.entries(weakSkills).filter(([, score]) => Number(score) > 0).sort((a, b) => Number(b[1]) - Number(a[1])).map(([skill, count]) => `${skill} (${count} missed)`).join(', ');
+  const targetedInstruction = weakFocus ? `The student has struggled most with ${weakFocus}. Include at least 3 of the 6 questions about the most-missed skill, while still keeping the set varied.` : 'Spread the questions across the relevant skills.';
+  const prompt = `Create exactly 6 ${focus} multiple-choice problems for a middle-school student at the estimated English level “${level}”. These should feel like real questions from a thoughtful school workbook: use short passages, clear situations, sentence editing, inference, context clues, or meaningful examples instead of repeated definitions. Every question must test a different idea, and all four choices must be plausible but clearly different; never repeat a choice or make two choices nearly identical. ${targetedInstruction} Return ONLY valid JSON with this shape: {"title":"short title","passage":"optional short passage, empty string if not needed","questions":[{"skill":"Vocabulary|Grammar|Reading|Spelling","prompt":"question","choices":["choice 1","choice 2","choice 3","choice 4"],"answer":0,"explanation":"short kind explanation"}]}. The answer must be a number from 0 to 3. Do not ask the student to type a response. Do not include markdown fences or any text outside the JSON.`;
+  const retryPrompt = `Return a JSON object with exactly 6 different workbook-style questions now. Each question must have a skill, prompt, exactly 4 distinct choices, a numeric answer from 0 to 3, and a short explanation. Topic: ${focus}. Student level: ${level}. ${targetedInstruction}`;
   let lastError;
   for (const request of [prompt, retryPrompt]) {
     try {
@@ -90,18 +107,24 @@ async function createPractice({ level, type }) {
       const practice = JSON.parse(jsonText);
       if (!practice || !Array.isArray(practice.questions) || practice.questions.length < 6) throw new Error('not enough questions');
       practice.questions = practice.questions.slice(0, 6).map((question) => ({
+        skill: String(question.skill || (type === 'vocabulary' ? 'Vocabulary' : type === 'reading' ? 'Reading' : 'General English')),
         prompt: String(question.prompt || 'Choose the best answer.'),
-        choices: Array.isArray(question.choices) ? question.choices.slice(0, 4).map(String) : [],
+        choices: Array.isArray(question.choices) ? question.choices.slice(0, 4).map((choice) => typeof choice === 'object' ? String(choice.option || choice.text || choice.label || choice.value || '') : String(choice)) : [],
         answer: Number(question.answer),
         explanation: String(question.explanation || 'Nice effort. Review the answer and try the next one.')
       }));
       if (practice.questions.some((question) => question.choices.length !== 4 || question.answer < 0 || question.answer > 3)) throw new Error('incomplete question');
+      practice.questions = practice.questions.map((question, index) => {
+        const shift = (index + 1) % question.choices.length;
+        return { ...question, choices: question.choices.slice(shift).concat(question.choices.slice(0, shift)), answer: (question.answer - shift + question.choices.length) % question.choices.length };
+      });
       return { title: String(practice.title || 'Your next practice'), passage: String(practice.passage || ''), questions: practice.questions, model: OLLAMA_MODEL };
     } catch (error) {
       lastError = error;
     }
   }
-  const error = new Error(lastError?.code === 'OLLAMA_OFFLINE' ? lastError.message : 'The local AI did not create six usable questions. Try generating the practice again.');
+  if (lastError?.code !== 'OLLAMA_OFFLINE') return { title: 'Practice set', passage: '', questions: fallbackPractice(weakSkills).map((question, index) => { const shift = (index + 1) % question.choices.length; return { ...question, choices: question.choices.slice(shift).concat(question.choices.slice(0, shift)), answer: (question.answer - shift + question.choices.length) % question.choices.length }; }), model: OLLAMA_MODEL, fallback: true };
+  const error = new Error(lastError.message);
   error.code = lastError?.code || 'OLLAMA_BAD_PRACTICE';
   throw error;
 }
