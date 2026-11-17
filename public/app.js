@@ -106,7 +106,7 @@ async function refreshStatus() {
     if (!data.ok) throw new Error(data.error);
     $('#ollama-status').textContent = 'Ready';
   } catch (error) {
-    $('#ollama-status').textContent = 'Unavailable';
+    $('#ollama-status').textContent = window.location.protocol === 'file:' ? 'Run npm start to use AI' : 'Unavailable';
   }
 }
 
@@ -209,7 +209,7 @@ async function sendMessage(message) {
     if (data.answer) { state.chatHistory = [...(state.chatHistory || []), { role: 'user', content: message }, { role: 'assistant', content: data.answer }].slice(-8); }
   } catch {
     const thinking = [...document.querySelectorAll('.bubble.guide')].pop();
-    if (thinking) thinking.textContent = 'The assistant is unavailable. Try again.';
+    if (thinking) thinking.textContent = window.location.protocol === 'file:' ? 'Start the local server with npm start, then try again.' : 'The assistant is unavailable. Try again.';
   } finally {
     if (sendButton) sendButton.disabled = false;
   }
