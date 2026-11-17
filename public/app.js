@@ -283,16 +283,39 @@ function openBook(index) {
   if (!book) return showWorkspaceError('That reading selection could not be opened. Please choose another one.');
   state.currentBook = book;
   state.readingTranscript = '';
+  state.readingBaseTranscript = '';
   openWorkspace('Reading', book.title);
   $('#question-count').textContent = 'Read aloud';
   const paragraphs = book.passage.split('\n\n').map((paragraph) => `<p>${paragraph}</p>`).join('');
-  $('#workspace-content').innerHTML = `<article class="book-page">${paragraphs}</article><div class="reading-tools"><button class="primary" id="start-reading">Start reading aloud</button><button class="secondary" id="stop-reading" disabled>Stop</button><span id="speech-status" class="small-note">No recording</span></div><div class="result"><h3>Transcript</h3><p id="reading-transcript">Your spoken words will appear here.</p><button class="secondary" id="rate-reading" disabled>Rate reading</button><p id="reading-feedback" class="small-note"></p></div><div class="result"><h3>Questions</h3><p id="book-questions-lock">Finish reading aloud to unlock the questions.</p><div id="book-questions" class="hidden"></div><div id="book-question-actions" class="action-row hidden"><button class="primary" id="check-book">Check answers</button><span id="book-score" class="small-note"></span></div></div>`;
+  $('#workspace-content').innerHTML = `<article class="book-page">${paragraphs}</article><div class="reading-tools"><button class="primary" id="start-reading">Start reading aloud</button><button class="secondary" id="stop-reading" disabled>Stop</button><span id="speech-status" class="small-note">Read the full passage to unlock questions.</span></div><div class="result"><h3>Transcript</h3><p id="reading-transcript">Your spoken words will appear here.</p><button class="secondary" id="rate-reading" disabled>Rate reading</button><p id="reading-feedback" class="small-note"></p></div><div class="result"><h3>Questions</h3><p id="book-questions-lock">Read the full passage aloud to unlock the questions.</p><div id="book-questions" class="hidden"></div><div id="book-question-actions" class="action-row hidden"><button class="primary" id="check-book">Check answers</button><span id="book-score" class="small-note"></span></div></div>`;
   $('#start-reading').addEventListener('click', startReadingAloud); $('#stop-reading').addEventListener('click', stopReadingAloud); $('#rate-reading').addEventListener('click', rateReading);
+}
+
+function readingWords(text) { return String(text || '').toLowerCase().replace(/[^a-z0-9' ]/g, ' ').split(/\s+/).filter(Boolean); }
+
+function readingMetrics() {
+  const target = readingWords(state.currentBook?.passage);
+  const spoken = readingWords(state.readingTranscript);
+  let targetIndex = 0;
+  let matched = 0;
+  spoken.forEach((word) => {
+    for (let index = targetIndex; index < Math.min(targetIndex + 8, target.length); index += 1) {
+      if (target[index] === word) { matched += 1; targetIndex = index + 1; break; }
+    }
+  });
+  return { matched, targetWords: target.length, spokenWords: spoken.length, coverage: target.length ? matched / target.length : 0, accuracy: spoken.length ? Math.min(1, matched / spoken.length) : 0 };
+}
+
+function updateReadingProgress() {
+  const metrics = readingMetrics();
+  const percent = Math.round(metrics.coverage * 100);
+  $('#speech-status').textContent = `${percent}% of the passage matched`;
+  if (percent >= 80) $('#speech-status').textContent = 'Passage read — stop recording to unlock questions.';
 }
 
 function unlockReadingQuestions() {
   const book = state.currentBook;
-  if (!book || !state.readingTranscript.trim()) return;
+  if (!book || !state.readingTranscript.trim() || readingMetrics().coverage < 0.8) return;
   $('#book-questions-lock').classList.add('hidden');
   $('#book-questions').classList.remove('hidden');
   $('#book-question-actions').classList.remove('hidden');
@@ -304,16 +327,16 @@ function unlockReadingQuestions() {
 function startReadingAloud() {
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Recognition) { $('#speech-status').textContent = 'Speech recognition is not available in this browser.'; return; }
-  const recognition = new Recognition(); speechRecognition = recognition; recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'en-US';
+  const recognition = new Recognition(); speechRecognition = recognition; state.readingBaseTranscript = state.readingTranscript || ''; recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'en-US';
   recognition.onstart = () => { $('#speech-status').textContent = 'Listening'; $('#start-reading').disabled = true; $('#stop-reading').disabled = false; };
-  recognition.onresult = (event) => { state.readingTranscript = Array.from(event.results).map((result) => result[0].transcript).join(' '); $('#reading-transcript').textContent = state.readingTranscript; $('#rate-reading').disabled = !state.readingTranscript.trim(); };
+  recognition.onresult = (event) => { const liveTranscript = Array.from(event.results).map((result) => result[0].transcript).join(' '); state.readingTranscript = [state.readingBaseTranscript, liveTranscript].filter(Boolean).join(' '); $('#reading-transcript').textContent = state.readingTranscript; $('#rate-reading').disabled = !state.readingTranscript.trim(); updateReadingProgress(); };
   recognition.onerror = () => { $('#speech-status').textContent = 'Speech recognition stopped.'; $('#start-reading').disabled = false; $('#stop-reading').disabled = true; };
-  recognition.onend = () => { $('#speech-status').textContent = state.readingTranscript ? 'Transcript ready' : 'No recording'; $('#start-reading').disabled = false; $('#stop-reading').disabled = true; if (state.readingTranscript.trim()) unlockReadingQuestions(); };
+  recognition.onend = () => { $('#start-reading').disabled = false; $('#stop-reading').disabled = true; if (state.readingTranscript.trim() && readingMetrics().coverage >= 0.8) { $('#speech-status').textContent = 'Passage complete — questions unlocked.'; unlockReadingQuestions(); } else if (state.readingTranscript.trim()) { updateReadingProgress(); } else $('#speech-status').textContent = 'No recording'; };
   try { recognition.start(); } catch { $('#speech-status').textContent = 'The microphone could not start. Check browser microphone permission and try again.'; $('#start-reading').disabled = false; $('#stop-reading').disabled = true; }
 }
 
 function stopReadingAloud() { try { if (speechRecognition) speechRecognition.stop(); } catch { $('#speech-status').textContent = 'The recording could not be stopped. Try again.'; } }
-async function rateReading() { const feedback = $('#reading-feedback'); feedback.textContent = 'Rating…'; $('#rate-reading').disabled = true; try { const response = await fetch(`${API_BASE}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Rate this read-aloud transcript for a middle-school English learner. Give a short, kind score from 1 to 5 for fluency and one specific next practice tip.', context: `Book passage: ${state.currentBook.passage}\nStudent transcript: ${state.readingTranscript}` }), signal: AbortSignal.timeout(50000) }); const data = await response.json(); feedback.textContent = data.answer || data.error || 'No rating available.'; } catch { feedback.textContent = 'The reading rating is unavailable.'; } finally { $('#rate-reading').disabled = false; } }
+async function rateReading() { const feedback = $('#reading-feedback'); feedback.textContent = 'Rating…'; $('#rate-reading').disabled = true; const metrics = readingMetrics(); const score = Math.max(1, Math.min(5, Math.round(((metrics.coverage * 0.7) + (metrics.accuracy * 0.3)) * 5))); try { const response = await fetch(`${API_BASE}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Give kind, specific feedback on this read-aloud. Do not invent a score; use the measured passage coverage and word-order accuracy below. Give one strength and one next practice tip.', context: `Passage coverage: ${Math.round(metrics.coverage * 100)}%. Word-order accuracy: ${Math.round(metrics.accuracy * 100)}%. Local score: ${score}/5. Passage: ${state.currentBook.passage}\nStudent transcript: ${state.readingTranscript}` }), signal: AbortSignal.timeout(50000) }); const data = await response.json(); feedback.textContent = `Read-aloud score: ${score}/5 (${Math.round(metrics.coverage * 100)}% of the passage matched). ${data.answer || data.error || 'Keep practicing.'}`; } catch { feedback.textContent = `Read-aloud score: ${score}/5 (${Math.round(metrics.coverage * 100)}% of the passage matched). The AI tip is unavailable right now.`; } finally { $('#rate-reading').disabled = false; } }
 
 async function startAiPractice(type = 'mixed') {
   if (type === 'ai') type = 'mixed';
