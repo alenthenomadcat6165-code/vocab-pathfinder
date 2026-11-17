@@ -99,10 +99,10 @@ function showLockedLevelMessage() {
 }
 
 function scoreFeedback(score) {
-  if (score <= 20) return { message: 'Get your grades up.', alt: 'Cat photo for a score from 0 to 20 percent', image: 'score-cat-low.jpg' };
-  if (score <= 50) return { message: 'Not good.', alt: 'Cat photo for a score from 21 to 50 percent', image: 'score-cat-midlow.jpg' };
-  if (score <= 70) return { message: 'Not bad.', alt: 'Cat photo for a score from 51 to 70 percent', image: 'score-cat-midhigh.jpg' };
-  return { message: 'Good job.', alt: 'Cat photo for a score from 71 to 100 percent', image: 'score-cat-high.jpg' };
+  if (score <= 20) return { message: 'Get your grades up.', alt: 'Cat image for a score from 0 to 20 percent', image: 'score-cat-low.webp' };
+  if (score <= 50) return { message: 'Not good.', alt: 'Cat image for a score from 21 to 50 percent', image: 'score-cat-midlow.webp' };
+  if (score <= 70) return { message: 'Not bad.', alt: 'Cat image for a score from 51 to 70 percent', image: 'score-cat-midhigh.webp' };
+  return { message: 'Good job.', alt: 'Cat image for a score from 71 to 100 percent', image: 'score-cat-high.webp' };
 }
 
 function scoreFeedbackMarkup(score) {
