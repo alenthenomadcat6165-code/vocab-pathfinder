@@ -36,7 +36,16 @@ const vocabularySeeds = [
   ['infer', 'to figure out from evidence'], ['innovate', 'to introduce a new idea or method'], ['logical', 'using clear and sensible reasoning'], ['motivate', 'to give a reason or desire to act'], ['neutral', 'not taking either side'], ['objective', 'based on facts rather than feelings'], ['organize', 'to arrange in a useful order'], ['perspective', 'a particular way of seeing something'], ['predict', 'to say what may happen'], ['relevant', 'connected to the subject'],
   ['sequence', 'the order in which things happen'], ['summarize', 'to give the main points briefly'], ['support', 'to provide evidence or help'], ['theme', 'a central idea in a work'], ['thorough', 'complete and careful'], ['tone', 'the feeling or attitude in words'], ['transparent', 'easy to see through or understand'], ['verify', 'to check that something is true'], ['wisdom', 'good judgment gained from experience'], ['resource', 'a useful source of help or information']
 ];
-const vocabularyPath = vocabularySeeds.map(([word, meaning], index) => ({ word, meaning, example: `Use “${word}” when talking about ${meaning}.`, skill: ['Meaning', 'Context', 'Sentence use', 'Reading clues'][index % 4] }));
+const vocabularyPath = Array.from({ length: 250 }, (_, index) => {
+  const [word, meaning] = vocabularySeeds[index % vocabularySeeds.length];
+  return { word, meaning, example: `Use “${word}” when talking about ${meaning}.`, skill: ['Meaning', 'Context', 'Sentence use', 'Reading clues'][index % 4] };
+});
+const vocabularyNodes = vocabularyPath.flatMap((item, index) => [
+  { type: 'lesson', lessonIndex: index, label: item.word },
+  ...((index + 1) % 10 === 0 ? [{ type: 'checkpoint', checkpointIndex: (index + 1) / 10, label: `Checkpoint ${(index + 1) / 10}` }] : [])
+]);
+const lessonNodeIndex = (lessonIndex) => lessonIndex + Math.floor(lessonIndex / 10);
+const checkpointNodeIndex = (checkpointIndex) => checkpointIndex * 10 + checkpointIndex - 1;
 const readingSeeds = [
   ['The Library Window', 'Jordan made a short plan, looked up two unfamiliar words, and asked for help with the hardest paragraph. By the end, the chapter felt less confusing.', 'Why did the chapter feel less confusing?', ['Jordan skipped it.', 'Jordan used a plan and asked for help.', 'The library became louder.', 'The words disappeared.'], 1],
   ['A Small Change', 'Every afternoon, Lena placed a bowl of water near the garden. After several days, more birds arrived, and Lena began writing down their colors and songs.', 'What did Lena’s habit help her do?', ['Notice more details', 'Close the garden', 'Forget the birds', 'Make afternoons shorter'], 0],
@@ -228,10 +237,16 @@ function sendChat(event) { event.preventDefault(); const input = $('#chat-input'
 
 function showVocabularyPage() {
   openWorkspace('Vocabulary', 'Word path');
-  $('#question-count').textContent = `${vocabularyPath.length} words`;
+  $('#question-count').textContent = `${vocabularyPath.length} lessons`;
   const unlocked = window.progressStore.loadProgress().vocabUnlocked || 1;
-  $('#workspace-content').innerHTML = `<p class="muted">Complete each lesson to open the next dot.</p><div class="word-path">${vocabularyPath.map((item, index) => `<div class="path-node"><button class="word-dot ${index < unlocked ? '' : 'locked'}" data-word-index="${index}" aria-label="${index < unlocked ? item.word : 'Locked lesson'}">${index < unlocked ? index + 1 : icon('lock')}</button></div>`).join('')}</div>`;
-  document.querySelectorAll('[data-word-index]').forEach((button) => button.addEventListener('click', () => { const index = Number(button.dataset.wordIndex); if (index < unlocked) openVocabularyLesson(index); else showLockedLevelMessage(); }));
+  $('#workspace-content').innerHTML = `<p class="muted">Complete each lesson to open the next dot. Every tenth lesson ends with a 15-question checkpoint.</p><div class="word-path">${vocabularyNodes.map((node, index) => `<div class="path-node"><button class="word-dot ${index < unlocked ? '' : 'locked'} ${node.type === 'checkpoint' ? 'checkpoint-dot' : ''}" data-node-index="${index}" aria-label="${index < unlocked ? node.label : 'Locked lesson'}">${index < unlocked ? (node.type === 'checkpoint' ? icon('assignment') : node.lessonIndex + 1) : icon('lock')}</button></div>`).join('')}</div>`;
+  document.querySelectorAll('[data-node-index]').forEach((button) => button.addEventListener('click', () => {
+    const nodeIndex = Number(button.dataset.nodeIndex);
+    const node = vocabularyNodes[nodeIndex];
+    if (nodeIndex >= unlocked) return showLockedLevelMessage();
+    if (node.type === 'checkpoint') return openVocabularyCheckpoint(node.checkpointIndex);
+    return openVocabularyLesson(node.lessonIndex);
+  }));
 }
 
 function vocabularyQuestions(item) {
@@ -257,6 +272,8 @@ function vocabularyQuestions(item) {
 function openVocabularyLesson(index) {
   const item = vocabularyPath[index];
   state.vocabLessonIndex = index;
+  state.vocabNodeIndex = lessonNodeIndex(index);
+  state.vocabIsCheckpoint = false;
   state.vocabQuestions = vocabularyQuestions(item);
   state.vocabQuestionIndex = 0;
   state.vocabAnswers = [];
@@ -269,14 +286,42 @@ function openVocabularyLesson(index) {
 }
 
 function renderVocabularyQuestion() {
-  const item = vocabularyPath[state.vocabLessonIndex];
   const question = state.vocabQuestions[state.vocabQuestionIndex];
-  $('#question-count').textContent = `${state.vocabQuestionIndex + 1} / 6`;
-  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>Lesson ${state.vocabLessonIndex + 1} · Question ${state.vocabQuestionIndex + 1} of 6</small><h3>Practice question</h3></div><div class="vocab-question"><p><strong>${state.vocabQuestionIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-vocab-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div><div class="action-row"><button class="secondary" id="back-to-path">Back to path</button><button class="primary" id="next-vocab" disabled>${state.vocabQuestionIndex === 5 ? 'Finish lesson' : 'Next'} ${icon('arrow_forward')}</button></div>`;
+  if (!question) return showWorkspaceError('This vocabulary question could not be loaded. Please return to the word path and try again.');
+  const totalQuestions = state.vocabQuestions.length;
+  const heading = state.vocabIsCheckpoint ? `Checkpoint ${state.vocabCheckpointIndex}` : `Lesson ${state.vocabLessonIndex + 1}`;
+  $('#question-count').textContent = `${state.vocabQuestionIndex + 1} / ${totalQuestions}`;
+  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>${heading} · Question ${state.vocabQuestionIndex + 1} of ${totalQuestions}</small><h3>${state.vocabIsCheckpoint ? 'Checkpoint review' : 'Practice question'}</h3></div><div class="vocab-question"><p><strong>${state.vocabQuestionIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-vocab-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div><div class="action-row"><button class="secondary" id="back-to-path">Back to path</button><button class="primary" id="next-vocab" disabled>${state.vocabQuestionIndex === totalQuestions - 1 ? (state.vocabIsCheckpoint ? 'Finish checkpoint' : 'Finish lesson') : 'Next'} ${icon('arrow_forward')}</button></div>`;
   let selected = null;
   document.querySelectorAll('[data-vocab-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-vocab-choice]').forEach((choice) => choice.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.vocabChoice); $('#next-vocab').disabled = false; }));
   $('#back-to-path').addEventListener('click', showVocabularyPage);
-  $('#next-vocab').addEventListener('click', () => { state.vocabAnswers.push(selected); if (state.vocabQuestionIndex < 5) { state.vocabQuestionIndex += 1; window.progressStore.saveProgress({ currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: state.vocabQuestionIndex }); renderVocabularyQuestion(); } else { const progress = window.progressStore.loadProgress(); const correctAnswers = state.vocabAnswers.reduce((total, answer, index) => total + (answer === state.vocabQuestions[index].answer ? 1 : 0), 0); const score = Math.round((correctAnswers / state.vocabQuestions.length) * 100); window.progressStore.saveProgress({ vocabularyScore: score, vocabUnlocked: Math.max(progress.vocabUnlocked || 1, state.vocabLessonIndex + 2), currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: 6, sessions: progress.sessions + 1 }); openWorkspace('Vocabulary lesson', 'Lesson complete'); $('#question-count').textContent = `${score}%`; $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${correctAnswers} out of ${state.vocabQuestions.length}. The next dot is now available.</p><button class="primary" id="continue-vocab">Return to path ${icon('arrow_forward')}</button></div>`; $('#continue-vocab').addEventListener('click', showVocabularyPage); } });
+  $('#next-vocab').addEventListener('click', () => { state.vocabAnswers.push(selected); if (state.vocabQuestionIndex < state.vocabQuestions.length - 1) { state.vocabQuestionIndex += 1; window.progressStore.saveProgress({ currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: state.vocabQuestionIndex }); renderVocabularyQuestion(); } else { finishVocabularyActivity(); } });
+}
+
+function openVocabularyCheckpoint(checkpointIndex) {
+  const start = (checkpointIndex - 1) * 10;
+  const items = vocabularyPath.slice(start, start + 10);
+  state.vocabLessonIndex = null;
+  state.vocabCheckpointIndex = checkpointIndex;
+  state.vocabNodeIndex = checkpointNodeIndex(checkpointIndex);
+  state.vocabIsCheckpoint = true;
+  state.vocabQuestions = items.map((item) => vocabularyQuestions(item)[0]).concat(items.slice(0, 5).map((item) => vocabularyQuestions(item)[1]));
+  state.vocabQuestionIndex = 0;
+  state.vocabAnswers = [];
+  openWorkspace('Vocabulary checkpoint', `Checkpoint ${checkpointIndex}`);
+  $('#question-count').textContent = `15 questions`;
+  renderVocabularyQuestion();
+}
+
+function finishVocabularyActivity() {
+  const progress = window.progressStore.loadProgress();
+  const correctAnswers = state.vocabAnswers.reduce((total, answer, index) => total + (answer === state.vocabQuestions[index].answer ? 1 : 0), 0);
+  const score = Math.round((correctAnswers / state.vocabQuestions.length) * 100);
+  window.progressStore.saveProgress({ vocabularyScore: score, vocabUnlocked: Math.max(progress.vocabUnlocked || 1, state.vocabNodeIndex + 2), currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: state.vocabQuestions.length, sessions: progress.sessions + 1 });
+  openWorkspace(state.vocabIsCheckpoint ? 'Vocabulary checkpoint' : 'Vocabulary lesson', state.vocabIsCheckpoint ? `Checkpoint ${state.vocabCheckpointIndex} complete` : 'Lesson complete');
+  $('#question-count').textContent = `${score}%`;
+  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${correctAnswers} out of ${state.vocabQuestions.length}. The next dot is now available.</p><button class="primary" id="continue-vocab">Return to path ${icon('arrow_forward')}</button></div>`;
+  $('#continue-vocab').addEventListener('click', showVocabularyPage);
 }
 
 function showReadingPage() {
