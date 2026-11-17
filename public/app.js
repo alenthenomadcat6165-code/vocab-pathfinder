@@ -222,7 +222,7 @@ function showVocabularyPage() {
   openWorkspace('Vocabulary', 'Word path');
   $('#question-count').textContent = `${vocabularyPath.length} words`;
   const unlocked = window.progressStore.loadProgress().vocabUnlocked || 1;
-  $('#workspace-content').innerHTML = `<p class="muted">Complete each lesson to open the next dot.</p><div class="word-path">${vocabularyPath.map((item, index) => `<button class="word-dot ${index < unlocked ? '' : 'locked'}" data-word-index="${index}" aria-label="${index < unlocked ? item.word : 'Locked lesson'}">${index < unlocked ? index + 1 : '🔒'}</button>`).join('')}</div>`;
+  $('#workspace-content').innerHTML = `<p class="muted">Complete each lesson to open the next dot.</p><div class="word-path">${vocabularyPath.map((item, index) => `<div class="path-node"><button class="word-dot ${index < unlocked ? '' : 'locked'}" data-word-index="${index}" aria-label="${index < unlocked ? item.word : 'Locked lesson'}">${index < unlocked ? index + 1 : '🔒'}</button></div>`).join('')}</div>`;
   document.querySelectorAll('[data-word-index]').forEach((button) => button.addEventListener('click', () => { const index = Number(button.dataset.wordIndex); if (index < unlocked) openVocabularyLesson(index); }));
 }
 
