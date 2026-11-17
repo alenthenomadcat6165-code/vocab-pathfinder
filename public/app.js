@@ -96,15 +96,15 @@ function showLockedLevelMessage() {
 }
 
 function scoreFeedback(score) {
-  if (score <= 20) return { message: 'Get your grades up.', alt: 'Cat meme saying get your grades up' };
-  if (score <= 50) return { message: 'Not good.', alt: 'Cat meme saying not good' };
-  if (score <= 70) return { message: 'Not bad.', alt: 'Cat meme saying not bad' };
-  return { message: 'Good job.', alt: 'Cat meme saying good job' };
+  if (score <= 20) return { message: 'Get your grades up.', alt: 'Cat photo for a score from 0 to 20 percent', image: 'score-cat-low.jpg' };
+  if (score <= 50) return { message: 'Not good.', alt: 'Cat photo for a score from 21 to 50 percent', image: 'score-cat-midlow.jpg' };
+  if (score <= 70) return { message: 'Not bad.', alt: 'Cat photo for a score from 51 to 70 percent', image: 'score-cat-midhigh.jpg' };
+  return { message: 'Good job.', alt: 'Cat photo for a score from 71 to 100 percent', image: 'score-cat-high.jpg' };
 }
 
 function scoreFeedbackMarkup(score) {
   const feedback = scoreFeedback(score);
-  return `<div class="score-feedback"><img src="locked-level.webp" alt="${feedback.alt}" /><strong>${feedback.message}</strong></div>`;
+  return `<div class="score-feedback"><img src="${feedback.image}" alt="${feedback.alt}" /><strong>${feedback.message}</strong></div>`;
 }
 
 function normalizePracticeQuestions(data) {
@@ -262,22 +262,20 @@ function showVocabularyPage() {
 }
 
 function vocabularyQuestions(item) {
-  const meaningSentence = `The student used “${item.word}” in a sentence about ${item.meaning}.`;
-  const oppositeSentence = `The student used “${item.word}” to mean the opposite of ${item.meaning}.`;
-  const unrelatedSentence = `The student used “${item.word}” as the name of a color.`;
-  const timeSentence = `The student used “${item.word}” to mean yesterday.`;
+  const otherWords = vocabularySeeds.filter(([word]) => word !== item.word).map(([word]) => word);
+  const otherMeanings = vocabularySeeds.filter(([word]) => word !== item.word).map(([, meaning]) => meaning);
   const makeQuestion = (prompt, choices, questionNumber) => {
-    const shift = (item.word.length + questionNumber) % choices.length;
+    const shift = (item.word.length * 3 + questionNumber * 2) % choices.length;
     const orderedChoices = choices.slice(shift).concat(choices.slice(0, shift));
     return { prompt, choices: orderedChoices, answer: (choices.length - shift) % choices.length };
   };
   return [
-    makeQuestion(`Which sentence uses “${item.word}” correctly?`, [meaningSentence, oppositeSentence, unrelatedSentence, timeSentence], 0),
-    makeQuestion(`Which sentence gives the best clue to the meaning of “${item.word}”?`, [meaningSentence, `The student placed “${item.word}” beside a drawing of a rainbow.`, `The student wrote “${item.word}” on a clock.`, `The student heard “${item.word}” during a song.`], 1),
-    makeQuestion(`Which sentence explains what “${item.word}” means?`, [meaningSentence, `The sentence says that “${item.word}” is a kind of sandwich.`, `The sentence says that “${item.word}” is a number.`, `The sentence says that “${item.word}” is a place to sleep.`], 2),
-    makeQuestion(`Which sentence would help a reader understand “${item.word}”?`, [meaningSentence, `The reader counted the letters in “${item.word}” but did not read the sentence.`, `The reader looked only at the color of the page.`, `The reader closed the book before seeing “${item.word}”.`], 3),
-    makeQuestion(`Which sentence has the closest meaning to “${item.word}”?`, [meaningSentence, oppositeSentence, unrelatedSentence, timeSentence], 4),
-    makeQuestion(`Which sentence shows a good way to learn “${item.word}”?`, [`The student wrote a new sentence using “${item.word}” and its meaning.`, `The student skipped the example and guessed every answer.`, `The student erased “${item.word}” before reading it.`, `The student changed “${item.word}” into a random number.`], 5)
+    makeQuestion(`In this sentence, what does “${item.word}” most likely mean? “The teacher explained that ${item.word} means ${item.meaning}.”`, [item.meaning, otherMeanings[0], otherMeanings[1], otherMeanings[2]], 0),
+    makeQuestion(`Which situation best shows the meaning of “${item.word}”?`, [`A person does something that ${item.meaning}.`, `A person does something that ${otherMeanings[3]}.`, `A person does something that ${otherMeanings[4]}.`, `A person does something that ${otherMeanings[5]}.`], 1),
+    makeQuestion(`Choose the word that best completes this sentence: “The author used ___ to describe something that ${item.meaning}.”`, [item.word, otherWords[0], otherWords[1], otherWords[2]], 2),
+    makeQuestion(`Which definition would belong in a vocabulary notebook for “${item.word}”?`, [item.meaning, otherMeanings[6], otherMeanings[7], otherMeanings[8]], 3),
+    makeQuestion(`Which clue would help a reader figure out “${item.word}” in a new passage?`, [`A nearby sentence explains that something ${item.meaning}.`, `A nearby sentence describes something that ${otherMeanings[9]}.`, `A nearby sentence describes something that ${otherMeanings[10]}.`, `A nearby sentence describes something that ${otherMeanings[11]}.`], 4),
+    makeQuestion(`Which sentence uses “${item.word}” in a way that matches its meaning?`, [`The class discussed how something could ${item.meaning}.`, `The class discussed how something could ${otherMeanings[12]}.`, `The class discussed how something could ${otherMeanings[13]}.`, `The class discussed how something could ${otherMeanings[14]}.`], 5)
   ];
 }
 
