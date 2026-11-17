@@ -77,6 +77,7 @@ let speechRecognition = null;
 const $ = (selector) => document.querySelector(selector);
 const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:3000' : '';
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+const icon = (name) => `<span class="material-symbols-rounded" aria-hidden="true">${name}</span>`;
 
 function normalizePracticeQuestions(data) {
   if (!Array.isArray(data?.questions) || data.questions.length < 6) throw new Error('The AI returned fewer than six questions. Try again.');
@@ -119,7 +120,7 @@ function renderQuestion() {
   if (!question) return showWorkspaceError('This question could not be loaded. Please return to the home page and try again.');
   $('#question-count').textContent = `${state.index + 1} / ${state.questions.length}`;
   const passage = state.passage && state.index === 0 ? `<div class="result"><p><strong>Read this passage first:</strong> ${escapeHtml(state.passage)}</p></div>` : '';
-  $('#workspace-content').innerHTML = `${passage}<div class="question"><h3>${escapeHtml(question.prompt)}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${escapeHtml(choice)}</button>`).join('')}</div><div class="action-row"><span class="small-note">Select one answer.</span><button class="primary" id="next-question" disabled>${state.index === state.questions.length - 1 ? 'Finish check' : 'Next'} <span>→</span></button></div></div>`;
+  $('#workspace-content').innerHTML = `${passage}<div class="question"><h3>${escapeHtml(question.prompt)}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${escapeHtml(choice)}</button>`).join('')}</div><div class="action-row"><span class="small-note">Select one answer.</span><button class="primary" id="next-question" disabled>${state.index === state.questions.length - 1 ? 'Finish check' : 'Next'} ${icon('arrow_forward')}</button></div></div>`;
   let selected = null;
   document.querySelectorAll('[data-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-choice]').forEach((item) => item.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.choice); $('#next-question').disabled = false; }));
   $('#next-question').addEventListener('click', () => { state.answers.push(selected); state.index += 1; if (state.index < state.questions.length) renderQuestion(); else finishQuestionSet(); });
@@ -170,7 +171,7 @@ async function startReadingLevelCheck() {
     renderQuestion();
   } catch (error) {
     $('#question-count').textContent = 'Needs attention';
-    $('#workspace-content').innerHTML = `<div class="result"><h3>Reading check unavailable.</h3><p>${escapeHtml(error.message)}</p><button class="primary" id="retry-reading-check">Try again <span>↻</span></button></div>`;
+    $('#workspace-content').innerHTML = `<div class="result"><h3>Reading check unavailable.</h3><p>${escapeHtml(error.message)}</p><button class="primary" id="retry-reading-check">Try again ${icon('refresh')}</button></div>`;
     $('#retry-reading-check').addEventListener('click', startReadingLevelCheck);
   }
 }
@@ -178,11 +179,11 @@ async function startReadingLevelCheck() {
 function showReadingLevelResult(level, score) {
   openWorkspace('Reading level check', 'Your starting point');
   $('#question-count').textContent = `${score}%`;
-  $('#workspace-content').innerHTML = `<div class="result"><h3>${escapeHtml(level)}</h3><p>You scored ${score}% on the six-question reading check. This is a starting estimate, not a permanent label.</p><button class="primary" id="open-level-practice">Open practice <span>→</span></button></div>`;
+  $('#workspace-content').innerHTML = `<div class="result"><h3>${escapeHtml(level)}</h3><p>You scored ${score}% on the six-question reading check. This is a starting estimate, not a permanent label.</p><button class="primary" id="open-level-practice">Open practice ${icon('arrow_forward')}</button></div>`;
   $('#open-level-practice').addEventListener('click', () => startAiPractice('mixed'));
 }
 
-function showPath(level, score) { openWorkspace('Assessment result', 'Estimated level'); $('#question-count').textContent = 'Complete'; $('#workspace-content').innerHTML = `<div class="result"><h3>${level}</h3><p>Focused assessment score: ${score}%.</p><div class="action-row"><span class="small-note">Generated practice contains six multiple-choice questions.</span><button class="primary" id="open-guide">Open practice <span>→</span></button></div></div>`; $('#open-guide').addEventListener('click', () => startAiPractice('mixed')); }
+function showPath(level, score) { openWorkspace('Assessment result', 'Estimated level'); $('#question-count').textContent = 'Complete'; $('#workspace-content').innerHTML = `<div class="result"><h3>${level}</h3><p>Focused assessment score: ${score}%.</p><div class="action-row"><span class="small-note">Generated practice contains six multiple-choice questions.</span><button class="primary" id="open-guide">Open practice ${icon('arrow_forward')}</button></div></div>`; $('#open-guide').addEventListener('click', () => startAiPractice('mixed')); }
 
 function startPractice(type) { if (type === 'chat') return openChat(); startAiPractice(type); }
 
@@ -192,7 +193,7 @@ function openChat() {
   state.chatContext = state.chatContext || '';
   openWorkspace('Questions', 'Question');
   $('#question-count').textContent = 'Optional';
-  $('#workspace-content').innerHTML = '<div class="chat-log" id="chat-log"><div class="bubble guide">Ask about a word, sentence, or reading passage.</div></div><form class="chat-form" id="chat-form"><input id="chat-input" autocomplete="off" placeholder="Ask a question" /><button class="primary" id="chat-send">Send <span>→</span></button></form>';
+  $('#workspace-content').innerHTML = `<div class="chat-log" id="chat-log"><div class="bubble guide">Ask about a word, sentence, or reading passage.</div></div><form class="chat-form" id="chat-form"><input id="chat-input" autocomplete="off" placeholder="Ask a question" /><button class="primary" id="chat-send">Send ${icon('arrow_forward')}</button></form>`;
   $('#chat-form').addEventListener('submit', sendChat);
 }
 
@@ -222,7 +223,7 @@ function showVocabularyPage() {
   openWorkspace('Vocabulary', 'Word path');
   $('#question-count').textContent = `${vocabularyPath.length} words`;
   const unlocked = window.progressStore.loadProgress().vocabUnlocked || 1;
-  $('#workspace-content').innerHTML = `<p class="muted">Complete each lesson to open the next dot.</p><div class="word-path">${vocabularyPath.map((item, index) => `<div class="path-node"><button class="word-dot ${index < unlocked ? '' : 'locked'}" data-word-index="${index}" aria-label="${index < unlocked ? item.word : 'Locked lesson'}">${index < unlocked ? index + 1 : '🔒'}</button></div>`).join('')}</div>`;
+  $('#workspace-content').innerHTML = `<p class="muted">Complete each lesson to open the next dot.</p><div class="word-path">${vocabularyPath.map((item, index) => `<div class="path-node"><button class="word-dot ${index < unlocked ? '' : 'locked'}" data-word-index="${index}" aria-label="${index < unlocked ? item.word : 'Locked lesson'}">${index < unlocked ? index + 1 : icon('lock')}</button></div>`).join('')}</div>`;
   document.querySelectorAll('[data-word-index]').forEach((button) => button.addEventListener('click', () => { const index = Number(button.dataset.wordIndex); if (index < unlocked) openVocabularyLesson(index); }));
 }
 
@@ -255,7 +256,7 @@ function openVocabularyLesson(index) {
   window.progressStore.saveProgress({ currentVocabLesson: index, currentVocabQuestion: 0 });
   openWorkspace('Vocabulary lesson', item.word);
   $('#question-count').textContent = 'Lesson';
-  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>Lesson ${index + 1} of ${vocabularyPath.length}</small><h3>${item.word}</h3><p>${item.meaning}</p><p><strong>Example:</strong> ${item.example}</p><button class="primary" id="start-vocab-quiz">Start six-question quiz <span>→</span></button></div><button class="secondary" id="back-to-path">Back to path</button>`;
+  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>Lesson ${index + 1} of ${vocabularyPath.length}</small><h3>${item.word}</h3><p>${item.meaning}</p><p><strong>Example:</strong> ${item.example}</p><button class="primary" id="start-vocab-quiz">Start six-question quiz ${icon('arrow_forward')}</button></div><button class="secondary" id="back-to-path">Back to path</button>`;
   $('#start-vocab-quiz').addEventListener('click', renderVocabularyQuestion);
   $('#back-to-path').addEventListener('click', showVocabularyPage);
 }
@@ -264,11 +265,11 @@ function renderVocabularyQuestion() {
   const item = vocabularyPath[state.vocabLessonIndex];
   const question = state.vocabQuestions[state.vocabQuestionIndex];
   $('#question-count').textContent = `${state.vocabQuestionIndex + 1} / 6`;
-  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>Lesson ${state.vocabLessonIndex + 1} · Question ${state.vocabQuestionIndex + 1} of 6</small><h3>Practice question</h3></div><div class="vocab-question"><p><strong>${state.vocabQuestionIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-vocab-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div><div class="action-row"><button class="secondary" id="back-to-path">Back to path</button><button class="primary" id="next-vocab" disabled>${state.vocabQuestionIndex === 5 ? 'Finish lesson' : 'Next'} <span>→</span></button></div>`;
+  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>Lesson ${state.vocabLessonIndex + 1} · Question ${state.vocabQuestionIndex + 1} of 6</small><h3>Practice question</h3></div><div class="vocab-question"><p><strong>${state.vocabQuestionIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-vocab-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div><div class="action-row"><button class="secondary" id="back-to-path">Back to path</button><button class="primary" id="next-vocab" disabled>${state.vocabQuestionIndex === 5 ? 'Finish lesson' : 'Next'} ${icon('arrow_forward')}</button></div>`;
   let selected = null;
   document.querySelectorAll('[data-vocab-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-vocab-choice]').forEach((choice) => choice.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.vocabChoice); $('#next-vocab').disabled = false; }));
   $('#back-to-path').addEventListener('click', showVocabularyPage);
-  $('#next-vocab').addEventListener('click', () => { state.vocabAnswers.push(selected); if (state.vocabQuestionIndex < 5) { state.vocabQuestionIndex += 1; window.progressStore.saveProgress({ currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: state.vocabQuestionIndex }); renderVocabularyQuestion(); } else { const progress = window.progressStore.loadProgress(); const correctAnswers = state.vocabAnswers.reduce((total, answer, index) => total + (answer === state.vocabQuestions[index].answer ? 1 : 0), 0); const score = Math.round((correctAnswers / state.vocabQuestions.length) * 100); window.progressStore.saveProgress({ vocabularyScore: score, vocabUnlocked: Math.max(progress.vocabUnlocked || 1, state.vocabLessonIndex + 2), currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: 6, sessions: progress.sessions + 1 }); openWorkspace('Vocabulary lesson', 'Lesson complete'); $('#question-count').textContent = `${score}%`; $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${correctAnswers} out of ${state.vocabQuestions.length}. The next dot is now available.</p><button class="primary" id="continue-vocab">Return to path <span>→</span></button></div>`; $('#continue-vocab').addEventListener('click', showVocabularyPage); } });
+  $('#next-vocab').addEventListener('click', () => { state.vocabAnswers.push(selected); if (state.vocabQuestionIndex < 5) { state.vocabQuestionIndex += 1; window.progressStore.saveProgress({ currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: state.vocabQuestionIndex }); renderVocabularyQuestion(); } else { const progress = window.progressStore.loadProgress(); const correctAnswers = state.vocabAnswers.reduce((total, answer, index) => total + (answer === state.vocabQuestions[index].answer ? 1 : 0), 0); const score = Math.round((correctAnswers / state.vocabQuestions.length) * 100); window.progressStore.saveProgress({ vocabularyScore: score, vocabUnlocked: Math.max(progress.vocabUnlocked || 1, state.vocabLessonIndex + 2), currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: 6, sessions: progress.sessions + 1 }); openWorkspace('Vocabulary lesson', 'Lesson complete'); $('#question-count').textContent = `${score}%`; $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${correctAnswers} out of ${state.vocabQuestions.length}. The next dot is now available.</p><button class="primary" id="continue-vocab">Return to path ${icon('arrow_forward')}</button></div>`; $('#continue-vocab').addEventListener('click', showVocabularyPage); } });
 }
 
 function showReadingPage() {
@@ -360,7 +361,7 @@ async function startAiPractice(type = 'mixed') {
     renderAiQuestion();
   } catch (error) {
     $('#question-count').textContent = 'Needs attention';
-    $('#workspace-content').innerHTML = `<div class="result"><h3>Questions unavailable.</h3><p>${error.message}</p><button class="primary" id="retry-ai">Try again <span>↻</span></button></div>`;
+    $('#workspace-content').innerHTML = `<div class="result"><h3>Questions unavailable.</h3><p>${error.message}</p><button class="primary" id="retry-ai">Try again ${icon('refresh')}</button></div>`;
     $('#retry-ai').addEventListener('click', () => startAiPractice(type));
   }
 }
@@ -371,7 +372,7 @@ function renderAiQuestion() {
   const questionCount = state.questions.length;
   $('#question-count').textContent = `${state.index + 1} / ${questionCount}`;
   const passage = state.passage && state.index === 0 ? `<div class="result"><p><strong>Read this first:</strong> ${escapeHtml(state.passage)}</p></div>` : '';
-  $('#workspace-content').innerHTML = `${passage}<div class="question"><h3>${escapeHtml(question.prompt)}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${escapeHtml(choice)}</button>`).join('')}</div><div class="action-row"><button class="secondary" id="ask-current-question">Ask about question</button><button class="primary" id="next-question" disabled>${state.index === questionCount - 1 ? 'Finish' : 'Next'} <span>→</span></button></div><p class="small-note">Select one answer.</p></div>`;
+  $('#workspace-content').innerHTML = `${passage}<div class="question"><h3>${escapeHtml(question.prompt)}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${escapeHtml(choice)}</button>`).join('')}</div><div class="action-row"><button class="secondary" id="ask-current-question">Ask about question</button><button class="primary" id="next-question" disabled>${state.index === questionCount - 1 ? 'Finish' : 'Next'} ${icon('arrow_forward')}</button></div><p class="small-note">Select one answer.</p></div>`;
   let selected = null;
   $('#ask-current-question').addEventListener('click', () => { state.chatContext = `Practice type: ${state.practiceType || 'personal path'}\nQuestion ${state.index + 1} of 6: ${question.prompt}\nChoices: ${question.choices.join(' | ')}\nThe student wants help with this exact question. Give a hint or explain the skill without giving away the answer unless they ask for the answer.`; openChat(); });
   document.querySelectorAll('[data-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-choice]').forEach((item) => item.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.choice); $('#next-question').disabled = false; }));
@@ -398,7 +399,7 @@ function finishAiPractice() {
   const review = state.questions.map((question, index) => `Q${index + 1}: ${question.prompt} Student choice: ${question.choices[state.answers[index]] || 'none'}. Correct choice: ${question.choices[question.answer]}.`).join('\n');
   const missed = state.questions.map((question, index) => ({ question, index })).filter(({ question, index }) => state.answers[index] !== question.answer);
   const reviewItems = missed.length ? missed.map(({ question, index }) => `<div class="review-item"><strong>Question ${index + 1}</strong><p>${escapeHtml(question.prompt)}</p><p class="wrong-answer">Your answer: ${escapeHtml(question.choices[state.answers[index]] || 'No answer')}</p><p class="right-answer">Right answer: ${escapeHtml(question.choices[question.answer])}</p><p>${escapeHtml(question.explanation)}</p></div>`).join('') : `<p>All ${questionCount} answers were correct.</p>`;
-  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${correctCount} out of ${questionCount}.</p><h3>Review</h3><div class="review-list">${reviewItems}</div><div class="action-row"><button class="secondary" id="review-button">Review with assistant →</button><button class="secondary" id="again-button">Generate another set →</button></div></div>`;
+  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${correctCount} out of ${questionCount}.</p><h3>Review</h3><div class="review-list">${reviewItems}</div><div class="action-row"><button class="secondary" id="review-button">Review with assistant ${icon('arrow_forward')}</button><button class="secondary" id="again-button">Generate another set ${icon('arrow_forward')}</button></div></div>`;
   $('#review-button').addEventListener('click', () => { state.chatContext = `The student just completed a connected six-question ${state.practiceType || 'personal'} practice. Here is the review:\n${review}\nHelp the student notice patterns and choose what to practice next.`; openChat(); });
   $('#again-button').addEventListener('click', () => startAiPractice(state.practiceType));
 }
@@ -407,7 +408,7 @@ function showPracticePage() {
   openWorkspace('Practice', 'Skill check');
   $('#question-count').textContent = 'Six questions';
   const focus = Object.entries(progress.weakSkills || {}).sort((a, b) => b[1] - a[1])[0]?.[0];
-  $('#workspace-content').innerHTML = `<div class="result"><h3>Practice test</h3><p>Six different questions will check vocabulary, reading, spelling, and grammar. ${focus ? `Recent mistakes will give extra practice to ${focus}.` : ''}</p><button class="primary" id="generate-test">Generate test <span>→</span></button></div>`;
+  $('#workspace-content').innerHTML = `<div class="result"><h3>Practice test</h3><p>Six different questions will check vocabulary, reading, spelling, and grammar. ${focus ? `Recent mistakes will give extra practice to ${focus}.` : ''}</p><button class="primary" id="generate-test">Generate test ${icon('arrow_forward')}</button></div>`;
   $('#generate-test').addEventListener('click', () => startAiPractice('test'));
 }
 function showProgressPage() {

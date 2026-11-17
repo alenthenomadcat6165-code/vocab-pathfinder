@@ -4,11 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vocab Pathfinder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header class="topbar">
-      <a class="brand" href="#top">Vocab Pathfinder</a>
+      <a class="brand" href="#top"><span class="material-symbols-rounded brand-icon" aria-hidden="true">menu_book</span>Vocab Pathfinder</a>
       <nav class="top-tabs" aria-label="Practice sections">
         <button class="top-tab active" data-page="home">Home</button>
         <button class="top-tab" data-page="vocabulary">Vocabulary</button>
@@ -28,11 +31,11 @@
 
       <section class="dashboard-grid">
         <article class="panel progress-panel">
-          <div class="panel-heading"><div><p class="eyebrow">Your progress</p><h2>Learning map</h2></div><span class="quiet-icon">↗</span></div>
+          <div class="panel-heading"><div><p class="eyebrow">Your progress</p><h2>Learning map</h2></div><span class="quiet-icon material-symbols-rounded" aria-hidden="true">north_east</span></div>
           <div class="level-card"><span>Current level</span><strong id="current-level">Not measured yet</strong><small id="session-count">0 learning sessions</small></div>
           <div class="skill-list"><div><span>Vocabulary</span><b id="vocab-score">Not started</b></div><div><span>Reading</span><b id="reading-score">Not started</b></div><div><span>Assessment</span><b id="path-score">Not assessed</b></div></div>
         </article>
-        <article class="panel why-panel"><p class="eyebrow">Start here</p><h2>Reading level check</h2><p>Answer six short questions about a reading passage. Your result is an estimate that helps choose practice.</p><button class="primary" id="start-reading-check">Start reading check <span>→</span></button></article>
+        <article class="panel why-panel"><p class="eyebrow">Start here</p><h2>Reading level check</h2><p>Answer six short questions about a reading passage. Your result is an estimate that helps choose practice.</p><button class="primary" id="start-reading-check">Start reading check <span class="material-symbols-rounded" aria-hidden="true">arrow_forward</span></button></article>
       </section>
 
       </div>
