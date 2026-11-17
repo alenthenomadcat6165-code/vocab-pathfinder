@@ -95,6 +95,18 @@ function showLockedLevelMessage() {
   $('#back-to-path').addEventListener('click', showVocabularyPage);
 }
 
+function scoreFeedback(score) {
+  if (score <= 20) return { message: 'Get your grades up.', alt: 'Cat meme saying get your grades up' };
+  if (score <= 50) return { message: 'Not good.', alt: 'Cat meme saying not good' };
+  if (score <= 70) return { message: 'Not bad.', alt: 'Cat meme saying not bad' };
+  return { message: 'Good job.', alt: 'Cat meme saying good job' };
+}
+
+function scoreFeedbackMarkup(score) {
+  const feedback = scoreFeedback(score);
+  return `<div class="score-feedback"><img src="locked-level.webp" alt="${feedback.alt}" /><strong>${feedback.message}</strong></div>`;
+}
+
 function normalizePracticeQuestions(data) {
   if (!Array.isArray(data?.questions) || data.questions.length < 6) throw new Error('The AI returned fewer than six questions. Try again.');
   const questions = data.questions.slice(0, 6).map((question) => {
@@ -195,11 +207,11 @@ async function startReadingLevelCheck() {
 function showReadingLevelResult(level, score) {
   openWorkspace('Reading level check', 'Your starting point');
   $('#question-count').textContent = `${score}%`;
-  $('#workspace-content').innerHTML = `<div class="result"><h3>${escapeHtml(level)}</h3><p>You scored ${score}% on the six-question reading check. This is a starting estimate, not a permanent label.</p><button class="primary" id="open-level-practice">Open practice ${icon('arrow_forward')}</button></div>`;
+  $('#workspace-content').innerHTML = `<div class="result"><h3>${escapeHtml(level)}</h3><p>You scored ${score}% on the six-question reading check. This is a starting estimate, not a permanent label.</p>${scoreFeedbackMarkup(score)}<button class="primary" id="open-level-practice">Open practice ${icon('arrow_forward')}</button></div>`;
   $('#open-level-practice').addEventListener('click', () => startAiPractice('mixed'));
 }
 
-function showPath(level, score) { openWorkspace('Assessment result', 'Estimated level'); $('#question-count').textContent = 'Complete'; $('#workspace-content').innerHTML = `<div class="result"><h3>${level}</h3><p>Focused assessment score: ${score}%.</p><div class="action-row"><span class="small-note">Generated practice contains six multiple-choice questions.</span><button class="primary" id="open-guide">Open practice ${icon('arrow_forward')}</button></div></div>`; $('#open-guide').addEventListener('click', () => startAiPractice('mixed')); }
+function showPath(level, score) { openWorkspace('Assessment result', 'Estimated level'); $('#question-count').textContent = 'Complete'; $('#workspace-content').innerHTML = `<div class="result"><h3>${level}</h3><p>Focused assessment score: ${score}%.</p>${scoreFeedbackMarkup(score)}<div class="action-row"><span class="small-note">Generated practice contains six multiple-choice questions.</span><button class="primary" id="open-guide">Open practice ${icon('arrow_forward')}</button></div></div>`; $('#open-guide').addEventListener('click', () => startAiPractice('mixed')); }
 
 function startPractice(type) { if (type === 'chat') return openChat(); startAiPractice(type); }
 
@@ -239,7 +251,7 @@ function showVocabularyPage() {
   openWorkspace('Vocabulary', 'Word path');
   $('#question-count').textContent = `${vocabularyPath.length} lessons`;
   const unlocked = window.progressStore.loadProgress().vocabUnlocked || 1;
-  $('#workspace-content').innerHTML = `<p class="muted">Complete each lesson to open the next dot. Every tenth lesson ends with a 15-question checkpoint.</p><div class="word-path">${vocabularyNodes.map((node, index) => `<div class="path-node"><button class="word-dot ${index < unlocked ? '' : 'locked'} ${node.type === 'checkpoint' ? 'checkpoint-dot' : ''}" data-node-index="${index}" aria-label="${index < unlocked ? node.label : 'Locked lesson'}">${index < unlocked ? (node.type === 'checkpoint' ? icon('assignment') : node.lessonIndex + 1) : icon('lock')}</button></div>`).join('')}</div>`;
+  $('#workspace-content').innerHTML = `<div class="vocabulary-intro"><img src="vocabulary-book.jpg" alt="An open book with writing" /><div><p class="muted">Complete each lesson to open the next dot. Every tenth lesson ends with a 15-question checkpoint.</p><p class="small-note">There are 250 lessons in this path.</p></div></div><div class="word-path">${vocabularyNodes.map((node, index) => `<div class="path-node"><button class="word-dot ${index < unlocked ? '' : 'locked'} ${node.type === 'checkpoint' ? 'checkpoint-dot' : ''}" data-node-index="${index}" aria-label="${index < unlocked ? node.label : 'Locked lesson'}">${index < unlocked ? (node.type === 'checkpoint' ? icon('assignment') : node.lessonIndex + 1) : icon('lock')}</button></div>`).join('')}</div>`;
   document.querySelectorAll('[data-node-index]').forEach((button) => button.addEventListener('click', () => {
     const nodeIndex = Number(button.dataset.nodeIndex);
     const node = vocabularyNodes[nodeIndex];
@@ -320,7 +332,7 @@ function finishVocabularyActivity() {
   window.progressStore.saveProgress({ vocabularyScore: score, vocabUnlocked: Math.max(progress.vocabUnlocked || 1, state.vocabNodeIndex + 2), currentVocabLesson: state.vocabLessonIndex, currentVocabQuestion: state.vocabQuestions.length, sessions: progress.sessions + 1 });
   openWorkspace(state.vocabIsCheckpoint ? 'Vocabulary checkpoint' : 'Vocabulary lesson', state.vocabIsCheckpoint ? `Checkpoint ${state.vocabCheckpointIndex} complete` : 'Lesson complete');
   $('#question-count').textContent = `${score}%`;
-  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${correctAnswers} out of ${state.vocabQuestions.length}. The next dot is now available.</p><button class="primary" id="continue-vocab">Return to path ${icon('arrow_forward')}</button></div>`;
+  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${correctAnswers} out of ${state.vocabQuestions.length}. The next dot is now available.</p>${scoreFeedbackMarkup(score)}<button class="primary" id="continue-vocab">Return to path ${icon('arrow_forward')}</button></div>`;
   $('#continue-vocab').addEventListener('click', showVocabularyPage);
 }
 
@@ -340,7 +352,7 @@ function openBook(index) {
   openWorkspace('Reading', book.title);
   $('#question-count').textContent = 'Read aloud';
   const paragraphs = book.passage.split('\n\n').map((paragraph) => `<p>${paragraph}</p>`).join('');
-  $('#workspace-content').innerHTML = `<article class="book-page">${paragraphs}</article><div class="reading-tools"><button class="primary" id="start-reading">Start reading aloud</button><button class="secondary" id="stop-reading" disabled>Stop</button><span id="speech-status" class="small-note">Read the full passage to unlock questions.</span></div><div class="result"><h3>Transcript</h3><p id="reading-transcript">Your spoken words will appear here.</p><button class="secondary" id="rate-reading" disabled>Rate reading</button><p id="reading-feedback" class="small-note"></p></div><div class="result"><h3>Questions</h3><p id="book-questions-lock">Read the full passage aloud to unlock the questions.</p><div id="book-questions" class="hidden"></div><div id="book-question-actions" class="action-row hidden"><button class="primary" id="check-book">Check answers</button><span id="book-score" class="small-note"></span></div></div>`;
+  $('#workspace-content').innerHTML = `<article class="book-page">${paragraphs}</article><div class="reading-tools"><button class="primary" id="start-reading">Start reading aloud</button><button class="secondary" id="stop-reading" disabled>Stop</button><span id="speech-status" class="small-note">Read the full passage to unlock questions.</span></div><div class="result"><h3>Transcript</h3><p id="reading-transcript">Your spoken words will appear here.</p><button class="secondary" id="rate-reading" disabled>Rate reading</button><p id="reading-feedback" class="small-note"></p><div id="reading-score-feedback"></div></div><div class="result"><h3>Questions</h3><p id="book-questions-lock">Read the full passage aloud to unlock the questions.</p><div id="book-questions" class="hidden"></div><div id="book-question-actions" class="action-row hidden"><button class="primary" id="check-book">Check answers</button><span id="book-score" class="small-note"></span></div><div id="book-score-feedback"></div></div>`;
   $('#start-reading').addEventListener('click', startReadingAloud); $('#stop-reading').addEventListener('click', stopReadingAloud); $('#rate-reading').addEventListener('click', rateReading);
 }
 
@@ -374,7 +386,7 @@ function unlockReadingQuestions() {
   $('#book-question-actions').classList.remove('hidden');
   $('#book-questions').innerHTML = book.questions.map((question, qIndex) => `<div class="book-question"><p><strong>${qIndex + 1}.</strong> ${question.prompt}</p><div class="choice-grid">${question.choices.map((choice, choiceIndex) => `<button class="choice" data-book-question="${qIndex}" data-book-choice="${choiceIndex}">${choice}</button>`).join('')}</div></div>`).join('');
   document.querySelectorAll('[data-book-question]').forEach((button) => button.addEventListener('click', () => { const qIndex = Number(button.dataset.bookQuestion); document.querySelectorAll(`[data-book-question="${qIndex}"]`).forEach((item) => item.classList.remove('selected')); button.classList.add('selected'); }));
-  $('#check-book').addEventListener('click', () => { const score = book.questions.reduce((total, question, qIndex) => total + (Number(document.querySelector(`[data-book-question="${qIndex}"].selected`)?.dataset.bookChoice) === question.answer ? 1 : 0), 0); $('#book-score').textContent = `${score} / ${book.questions.length} correct`; });
+  $('#check-book').addEventListener('click', () => { const score = book.questions.reduce((total, question, qIndex) => total + (Number(document.querySelector(`[data-book-question="${qIndex}"].selected`)?.dataset.bookChoice) === question.answer ? 1 : 0), 0); const percent = Math.round((score / book.questions.length) * 100); $('#book-score').textContent = `${score} / ${book.questions.length} correct (${percent}%)`; $('#book-score-feedback').innerHTML = scoreFeedbackMarkup(percent); });
 }
 
 function startReadingAloud() {
@@ -389,7 +401,7 @@ function startReadingAloud() {
 }
 
 function stopReadingAloud() { try { if (speechRecognition) speechRecognition.stop(); } catch { $('#speech-status').textContent = 'The recording could not be stopped. Try again.'; } }
-async function rateReading() { const feedback = $('#reading-feedback'); feedback.textContent = 'Rating…'; $('#rate-reading').disabled = true; const metrics = readingMetrics(); const score = Math.max(1, Math.min(5, Math.round(((metrics.coverage * 0.7) + (metrics.accuracy * 0.3)) * 5))); try { const response = await fetch(`${API_BASE}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Give kind, specific feedback on this read-aloud. Do not invent a score; use the measured passage coverage and word-order accuracy below. Give one strength and one next practice tip.', context: `Passage coverage: ${Math.round(metrics.coverage * 100)}%. Word-order accuracy: ${Math.round(metrics.accuracy * 100)}%. Local score: ${score}/5. Passage: ${state.currentBook.passage}\nStudent transcript: ${state.readingTranscript}` }), signal: AbortSignal.timeout(50000) }); const data = await response.json(); feedback.textContent = `Read-aloud score: ${score}/5 (${Math.round(metrics.coverage * 100)}% of the passage matched). ${data.answer || data.error || 'Keep practicing.'}`; } catch { feedback.textContent = `Read-aloud score: ${score}/5 (${Math.round(metrics.coverage * 100)}% of the passage matched). The AI tip is unavailable right now.`; } finally { $('#rate-reading').disabled = false; } }
+async function rateReading() { const feedback = $('#reading-feedback'); feedback.textContent = 'Rating…'; $('#rate-reading').disabled = true; const metrics = readingMetrics(); const coveragePercent = Math.round(metrics.coverage * 100); const score = Math.max(1, Math.min(5, Math.round(((metrics.coverage * 0.7) + (metrics.accuracy * 0.3)) * 5))); $('#reading-score-feedback').innerHTML = scoreFeedbackMarkup(coveragePercent); try { const response = await fetch(`${API_BASE}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Give kind, specific feedback on this read-aloud. Do not invent a score; use the measured passage coverage and word-order accuracy below. Give one strength and one next practice tip.', context: `Passage coverage: ${coveragePercent}%. Word-order accuracy: ${Math.round(metrics.accuracy * 100)}%. Local score: ${score}/5. Passage: ${state.currentBook.passage}\nStudent transcript: ${state.readingTranscript}` }), signal: AbortSignal.timeout(50000) }); const data = await response.json(); feedback.textContent = `Read-aloud score: ${score}/5 (${coveragePercent}% of the passage matched). ${data.answer || data.error || 'Keep practicing.'}`; } catch { feedback.textContent = `Read-aloud score: ${score}/5 (${coveragePercent}% of the passage matched). The AI tip is unavailable right now.`; } finally { $('#rate-reading').disabled = false; } }
 
 async function startAiPractice(type = 'mixed') {
   if (type === 'ai') type = 'mixed';
@@ -451,7 +463,7 @@ function finishAiPractice() {
   const review = state.questions.map((question, index) => `Q${index + 1}: ${question.prompt} Student choice: ${question.choices[state.answers[index]] || 'none'}. Correct choice: ${question.choices[question.answer]}.`).join('\n');
   const missed = state.questions.map((question, index) => ({ question, index })).filter(({ question, index }) => state.answers[index] !== question.answer);
   const reviewItems = missed.length ? missed.map(({ question, index }) => `<div class="review-item"><strong>Question ${index + 1}</strong><p>${escapeHtml(question.prompt)}</p><p class="wrong-answer">Your answer: ${escapeHtml(question.choices[state.answers[index]] || 'No answer')}</p><p class="right-answer">Right answer: ${escapeHtml(question.choices[question.answer])}</p><p>${escapeHtml(question.explanation)}</p></div>`).join('') : `<p>All ${questionCount} answers were correct.</p>`;
-  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${correctCount} out of ${questionCount}.</p><h3>Review</h3><div class="review-list">${reviewItems}</div><div class="action-row"><button class="secondary" id="review-button">Review with assistant ${icon('arrow_forward')}</button><button class="secondary" id="again-button">Generate another set ${icon('arrow_forward')}</button></div></div>`;
+  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${correctCount} out of ${questionCount}.</p>${scoreFeedbackMarkup(score)}<h3>Review</h3><div class="review-list">${reviewItems}</div><div class="action-row"><button class="secondary" id="review-button">Review with assistant ${icon('arrow_forward')}</button><button class="secondary" id="again-button">Generate another set ${icon('arrow_forward')}</button></div></div>`;
   $('#review-button').addEventListener('click', () => { state.chatContext = `The student just completed a connected six-question ${state.practiceType || 'personal'} practice. Here is the review:\n${review}\nHelp the student notice patterns and choose what to practice next.`; openChat(); });
   $('#again-button').addEventListener('click', () => startAiPractice(state.practiceType));
 }
