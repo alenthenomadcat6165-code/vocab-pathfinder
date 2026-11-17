@@ -79,6 +79,13 @@ const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:3000' 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
 const icon = (name) => `<span class="material-symbols-rounded" aria-hidden="true">${name}</span>`;
 
+function showLockedLevelMessage() {
+  openWorkspace('Vocabulary', 'Locked level');
+  $('#question-count').textContent = 'Locked';
+  $('#workspace-content').innerHTML = `<div class="locked-level-message"><img src="locked-level.webp" alt="A serious-looking white cat" /><h3>Get your levels right.</h3><p>Finish the lessons before this level to unlock it.</p><button class="secondary" id="back-to-path">Back to path</button></div>`;
+  $('#back-to-path').addEventListener('click', showVocabularyPage);
+}
+
 function normalizePracticeQuestions(data) {
   if (!Array.isArray(data?.questions) || data.questions.length < 6) throw new Error('The AI returned fewer than six questions. Try again.');
   const questions = data.questions.slice(0, 6).map((question) => {
@@ -224,7 +231,7 @@ function showVocabularyPage() {
   $('#question-count').textContent = `${vocabularyPath.length} words`;
   const unlocked = window.progressStore.loadProgress().vocabUnlocked || 1;
   $('#workspace-content').innerHTML = `<p class="muted">Complete each lesson to open the next dot.</p><div class="word-path">${vocabularyPath.map((item, index) => `<div class="path-node"><button class="word-dot ${index < unlocked ? '' : 'locked'}" data-word-index="${index}" aria-label="${index < unlocked ? item.word : 'Locked lesson'}">${index < unlocked ? index + 1 : icon('lock')}</button></div>`).join('')}</div>`;
-  document.querySelectorAll('[data-word-index]').forEach((button) => button.addEventListener('click', () => { const index = Number(button.dataset.wordIndex); if (index < unlocked) openVocabularyLesson(index); }));
+  document.querySelectorAll('[data-word-index]').forEach((button) => button.addEventListener('click', () => { const index = Number(button.dataset.wordIndex); if (index < unlocked) openVocabularyLesson(index); else showLockedLevelMessage(); }));
 }
 
 function vocabularyQuestions(item) {
