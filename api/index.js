@@ -36,7 +36,15 @@ async function askOpenAI(message, context = '', history = [], json = false) {
   return data.output_text || data.output?.flatMap((item) => item.content || []).map((item) => item.text || '').join('') || '';
 }
 
-function fallbackPractice(weakSkills = {}) {
+function fallbackPractice(weakSkills = {}, type = 'mixed') {
+  if (type === 'reading') return [
+    { skill: 'Reading', prompt: 'Where did Maya find the notebook?', choices: ['Beneath a bench at the library.', 'Inside a classroom desk.', 'Under a tree at home.', 'Beside a bus stop.'], answer: 0, explanation: 'The passage says Maya found it beneath a bench at the library.' },
+    { skill: 'Reading', prompt: 'What did Maya read on the first page?', choices: ['A recipe.', 'A name.', 'A map.', 'A poem.'], answer: 1, explanation: 'Maya read the name written on the first page.' },
+    { skill: 'Reading', prompt: 'Why did Maya carry the notebook to the front desk?', choices: ['She wanted to borrow it.', 'She wanted to draw in it.', 'She wanted to help return it.', 'She wanted to hide it.'], answer: 2, explanation: 'Taking it to the front desk helped the notebook reach its owner.' },
+    { skill: 'Reading', prompt: 'What did the librarian do with the notebook?', choices: ['Placed it in a safe drawer.', 'Threw it away.', 'Took it home.', 'Gave it to Maya.'], answer: 0, explanation: 'The librarian placed it in a safe drawer.' },
+    { skill: 'Reading', prompt: 'What can the reader infer about Maya?', choices: ['She is careless with other people’s things.', 'She makes a thoughtful choice.', 'She dislikes libraries.', 'She was looking for a notebook to buy.'], answer: 1, explanation: 'Maya made a careful choice by returning the lost notebook.' },
+    { skill: 'Reading', prompt: 'What is the main idea of the passage?', choices: ['A library is always crowded.', 'A careful action can help someone.', 'Notebooks are difficult to read.', 'Maya wants to work at the library.'], answer: 1, explanation: 'The passage is mainly about Maya helping someone by returning a lost belonging.' }
+  ];
   const questions = [
     { skill: 'Vocabulary', prompt: 'In the sentence “The narrow path was difficult to cross,” what does “narrow” mean?', choices: ['Not wide', 'Very bright', 'Easy to find', 'Full of water'], answer: 0, explanation: 'Narrow means not wide, which fits the description of the path.' },
     { skill: 'Reading', prompt: 'Maya packed a flashlight before entering the shed. What can the reader infer?', choices: ['The shed may be dark.', 'Maya planned to paint.', 'The shed was full of food.', 'Maya was going swimming.'], answer: 0, explanation: 'A flashlight helps someone see in a dark place.' },
@@ -77,7 +85,7 @@ async function createPractice({ level, type, weakSkills = {} }) {
     return { title: String(parsed.title || 'Your next practice'), passage: String(parsed.passage || ''), questions: shuffleQuestions(questions), model: OPENAI_MODEL };
   } catch (error) {
     if (error.code === 'OPENAI_KEY_MISSING' || error.code === 'OPENAI_KEY_INVALID') throw error;
-    return { title: 'Practice set', passage: '', questions: shuffleQuestions(fallbackPractice(weakSkills)), model: OPENAI_MODEL, fallback: true };
+    return { title: 'Practice set', passage: type === 'reading' ? 'Maya found a small notebook beneath a bench at the library. She read the name on the first page and carried the notebook to the front desk. The librarian thanked Maya and placed it in a safe drawer. Maya felt glad that a careful choice had helped someone find a lost belonging.' : '', questions: shuffleQuestions(fallbackPractice(weakSkills, type)), model: OPENAI_MODEL, fallback: true };
   }
 }
 

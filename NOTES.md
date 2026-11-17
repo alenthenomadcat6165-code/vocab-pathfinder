@@ -36,6 +36,7 @@
 - Online AI uses the server-only `OPENAI_API_KEY` environment variable. `OPENAI_MODEL` is optional and defaults to `gpt-4o-mini`.
 - Local development still uses the existing Ollama server and `OLLAMA_BASE_URL`/`OLLAMA_MODEL` settings.
 - To deploy, import this GitHub repository into Vercel, keep the framework preset as Other, and add `OPENAI_API_KEY` under Project Settings → Environment Variables for the environments you use. Do not add the key to `.env`, Git, or browser code.
+- The MVP reading-level check is available from the home page. It requests six AI reading questions and a passage through the backend, scores the answers into an estimated level, saves that level in browser progress, and opens the next practice step.
 
 ## Maybe Later
 

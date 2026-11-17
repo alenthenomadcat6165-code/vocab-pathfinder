@@ -112,13 +112,14 @@ async function refreshStatus() {
 
 function openWorkspace(kicker, title) { $('#workspace').classList.remove('hidden'); $('#workspace-kicker').textContent = kicker; $('#workspace-title').textContent = title; $('#workspace').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
-function startAssessment() { state = { mode: 'initial', questions: initialQuestions, index: 0, answers: [], level: 'Not measured yet', chatMessages: [] }; openWorkspace('Assessment · Part 1', 'English skills assessment'); renderQuestion(); }
+function startAssessment() { return startReadingLevelCheck(); }
 
 function renderQuestion() {
   const question = state.questions[state.index];
   if (!question) return showWorkspaceError('This question could not be loaded. Please return to the home page and try again.');
   $('#question-count').textContent = `${state.index + 1} / ${state.questions.length}`;
-  $('#workspace-content').innerHTML = `<div class="question"><h3>${question.prompt}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${choice}</button>`).join('')}</div><div class="action-row"><span class="small-note">Select one answer.</span><button class="primary" id="next-question" disabled>${state.index === state.questions.length - 1 ? 'Continue' : 'Next'} <span>→</span></button></div></div>`;
+  const passage = state.passage && state.index === 0 ? `<div class="result"><p><strong>Read this passage first:</strong> ${escapeHtml(state.passage)}</p></div>` : '';
+  $('#workspace-content').innerHTML = `${passage}<div class="question"><h3>${escapeHtml(question.prompt)}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${escapeHtml(choice)}</button>`).join('')}</div><div class="action-row"><span class="small-note">Select one answer.</span><button class="primary" id="next-question" disabled>${state.index === state.questions.length - 1 ? 'Finish check' : 'Next'} <span>→</span></button></div></div>`;
   let selected = null;
   document.querySelectorAll('[data-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-choice]').forEach((item) => item.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.choice); $('#next-question').disabled = false; }));
   $('#next-question').addEventListener('click', () => { state.answers.push(selected); state.index += 1; if (state.index < state.questions.length) renderQuestion(); else finishQuestionSet(); });
@@ -128,6 +129,16 @@ function levelFor(score) { if (score < 40) return 'Foundations'; if (score < 70)
 
 function finishQuestionSet() {
   const score = Math.round((state.answers.filter((answer, index) => answer === state.questions[index].answer).length / state.questions.length) * 100);
+  if (state.mode === 'reading-level') {
+    const progress = window.progressStore.loadProgress();
+    const weakSkills = { ...(progress.weakSkills || {}) };
+    state.questions.forEach((question, index) => { if (state.answers[index] !== question.answer) { const skill = question.skill || 'Reading'; weakSkills[skill] = (weakSkills[skill] || 0) + 1; } });
+    const level = levelFor(score);
+    window.progressStore.saveProgress({ sessions: progress.sessions + 1, latestLevel: level, assessmentScore: score, refinedScore: score, readingScore: score, weakSkills });
+    renderProgress();
+    showReadingLevelResult(level, score);
+    return;
+  }
   if (state.mode === 'initial') {
     state.level = levelFor(score);
     state.mode = 'refined'; state.questions = refinedQuestions; state.index = 0; state.answers = [];
@@ -141,6 +152,34 @@ function finishQuestionSet() {
   const progress = window.progressStore.saveProgress({ sessions: window.progressStore.loadProgress().sessions + 1, latestLevel: finalLevel, assessmentScore: score, refinedScore });
   renderProgress();
   showPath(finalLevel, refinedScore, progress);
+}
+
+async function startReadingLevelCheck() {
+  state = { mode: 'reading-level', questions: [], index: 0, answers: [], level: 'Not measured yet', chatMessages: [], passage: '' };
+  openWorkspace('Reading level check', 'Find your starting level');
+  $('#question-count').textContent = 'Preparing…';
+  $('#workspace-content').innerHTML = '<div class="result"><h3>Preparing six reading questions.</h3><p>The local assistant is making a short passage and questions for you.</p></div>';
+  try {
+    const response = await fetch(`${API_BASE}/api/practice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: 'Not measured yet', type: 'reading', weakSkills: {} }), signal: AbortSignal.timeout(50000) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'The reading check is unavailable right now.');
+    state.questions = normalizePracticeQuestions(data);
+    state.passage = data.passage || '';
+    state.index = 0;
+    state.answers = [];
+    renderQuestion();
+  } catch (error) {
+    $('#question-count').textContent = 'Needs attention';
+    $('#workspace-content').innerHTML = `<div class="result"><h3>Reading check unavailable.</h3><p>${escapeHtml(error.message)}</p><button class="primary" id="retry-reading-check">Try again <span>↻</span></button></div>`;
+    $('#retry-reading-check').addEventListener('click', startReadingLevelCheck);
+  }
+}
+
+function showReadingLevelResult(level, score) {
+  openWorkspace('Reading level check', 'Your starting point');
+  $('#question-count').textContent = `${score}%`;
+  $('#workspace-content').innerHTML = `<div class="result"><h3>${escapeHtml(level)}</h3><p>You scored ${score}% on the six-question reading check. This is a starting estimate, not a permanent label.</p><button class="primary" id="open-level-practice">Open practice <span>→</span></button></div>`;
+  $('#open-level-practice').addEventListener('click', () => startAiPractice('mixed'));
 }
 
 function showPath(level, score) { openWorkspace('Assessment result', 'Estimated level'); $('#question-count').textContent = 'Complete'; $('#workspace-content').innerHTML = `<div class="result"><h3>${level}</h3><p>Focused assessment score: ${score}%.</p><div class="action-row"><span class="small-note">Generated practice contains six multiple-choice questions.</span><button class="primary" id="open-guide">Open practice <span>→</span></button></div></div>`; $('#open-guide').addEventListener('click', () => startAiPractice('mixed')); }
@@ -369,4 +408,5 @@ function showPage(page) {
 
 document.querySelectorAll('.top-tab').forEach((button) => button.addEventListener('click', () => showPage(button.dataset.page)));
 $('#refresh-status').addEventListener('click', refreshStatus);
+$('#start-reading-check').addEventListener('click', startReadingLevelCheck);
 renderProgress(); refreshStatus();
