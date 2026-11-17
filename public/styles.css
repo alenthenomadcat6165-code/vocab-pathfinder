@@ -19,4 +19,4 @@
 .path-node .word-dot::after{display:none!important}
 .path-node::after{width:132px!important;top:43px!important}.path-node:nth-child(odd)::after{left:4px!important}.path-node:nth-child(even)::after{left:54px!important}@media(max-width:760px){.path-node::after{width:86px!important;top:47px!important}.path-node:nth-child(odd)::after{left:6px!important}.path-node:nth-child(even)::after{left:52px!important}}
 .word-path,.word-dot,.path-node .word-dot,.path-node .word-dot:hover,.word-dot.locked:hover{box-shadow:none!important}.path-node::after{z-index:0!important}.path-node .word-dot{z-index:2!important}
-.path-node::after{width:140px!important}@media(max-width:760px){.path-node::after{width:94px!important}}
+.path-node::after{width:160px!important}@media(max-width:760px){.path-node::after{width:112px!important}}
