@@ -38,7 +38,7 @@
 - To deploy, import this GitHub repository into Vercel, keep the framework preset as Other, and add `OPENAI_API_KEY` under Project Settings → Environment Variables for the environments you use. Do not add the key to `.env`, Git, or browser code.
 - The MVP reading-level check is available from the home page. It requests six AI reading questions and a passage through the backend, scores the answers into an estimated level, saves that level in browser progress, and opens the next practice step.
 - Vocabulary questions use varied context-clue, situation, cloze, definition, clue-selection, and sentence-use formats. The question design follows the approach described by [iRead's vocabulary-in-context guide](https://iread.education/resources/reading-quizzes/vocabulary-in-context-questions), without copying protected textbook questions.
-- Vocabulary visuals use a free-to-use [Unsplash open-book photo](https://unsplash.com/photos/person-reading-an-open-book-WwTsI9kPOI8). Score feedback uses four different text-free cat photos from Unsplash; the score message is shown beside the photo.
+- Score feedback uses four different text-free cat photos from Unsplash; the score message is shown beside the photo.
 
 ## Maybe Later
 
