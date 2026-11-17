@@ -37,11 +37,14 @@ const vocabularySeeds = [
   ['sequence', 'the order in which things happen'], ['summarize', 'to give the main points briefly'], ['support', 'to provide evidence or help'], ['theme', 'a central idea in a work'], ['thorough', 'complete and careful'], ['tone', 'the feeling or attitude in words'], ['transparent', 'easy to see through or understand'], ['verify', 'to check that something is true'], ['wisdom', 'good judgment gained from experience'], ['resource', 'a useful source of help or information']
 ];
 const vocabularyPath = Array.from({ length: 250 }, (_, index) => {
-  const [word, meaning] = vocabularySeeds[index % vocabularySeeds.length];
-  return { word, meaning, example: `Use “${word}” when talking about ${meaning}.`, skill: ['Meaning', 'Context', 'Sentence use', 'Reading clues'][index % 4] };
+  const items = [0, 1, 2].map((offset) => {
+    const [word, meaning] = vocabularySeeds[(index * 3 + offset) % vocabularySeeds.length];
+    return { word, meaning, example: `Use “${word}” when talking about ${meaning}.`, skill: ['Meaning', 'Context', 'Sentence use', 'Reading clues'][(index * 3 + offset) % 4] };
+  });
+  return { items };
 });
 const vocabularyNodes = vocabularyPath.flatMap((item, index) => [
-  { type: 'lesson', lessonIndex: index, label: item.word },
+  { type: 'lesson', lessonIndex: index, label: `Lesson ${index + 1}` },
   ...((index + 1) % 10 === 0 ? [{ type: 'checkpoint', checkpointIndex: (index + 1) / 10, label: `Checkpoint ${(index + 1) / 10}` }] : [])
 ]);
 const lessonNodeIndex = (lessonIndex) => lessonIndex + Math.floor(lessonIndex / 10);
@@ -280,17 +283,17 @@ function vocabularyQuestions(item) {
 }
 
 function openVocabularyLesson(index) {
-  const item = vocabularyPath[index];
+  const lesson = vocabularyPath[index];
   state.vocabLessonIndex = index;
   state.vocabNodeIndex = lessonNodeIndex(index);
   state.vocabIsCheckpoint = false;
-  state.vocabQuestions = vocabularyQuestions(item);
+  state.vocabQuestions = lesson.items.flatMap((item) => [vocabularyQuestions(item)[0], vocabularyQuestions(item)[2]]);
   state.vocabQuestionIndex = 0;
   state.vocabAnswers = [];
   window.progressStore.saveProgress({ currentVocabLesson: index, currentVocabQuestion: 0 });
-  openWorkspace('Vocabulary lesson', item.word);
+  openWorkspace('Vocabulary lesson', `Lesson ${index + 1}`);
   $('#question-count').textContent = 'Lesson';
-  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>Lesson ${index + 1} of ${vocabularyPath.length}</small><h3>${item.word}</h3><p>${item.meaning}</p><p><strong>Example:</strong> ${item.example}</p><button class="primary" id="start-vocab-quiz">Start six-question quiz ${icon('arrow_forward')}</button></div><button class="secondary" id="back-to-path">Back to path</button>`;
+  $('#workspace-content').innerHTML = `<div class="lesson-heading"><small>Lesson ${index + 1} of ${vocabularyPath.length}</small><h3>Three words in context</h3><p>This lesson practices meaning, context, and sentence use.</p><p><strong>Questions:</strong> six multiple-choice questions.</p><button class="primary" id="start-vocab-quiz">Start lesson ${icon('arrow_forward')}</button></div><button class="secondary" id="back-to-path">Back to path</button>`;
   $('#start-vocab-quiz').addEventListener('click', renderVocabularyQuestion);
   $('#back-to-path').addEventListener('click', showVocabularyPage);
 }
@@ -315,7 +318,7 @@ function openVocabularyCheckpoint(checkpointIndex) {
   state.vocabCheckpointIndex = checkpointIndex;
   state.vocabNodeIndex = checkpointNodeIndex(checkpointIndex);
   state.vocabIsCheckpoint = true;
-  state.vocabQuestions = items.map((item) => vocabularyQuestions(item)[0]).concat(items.slice(0, 5).map((item) => vocabularyQuestions(item)[1]));
+  state.vocabQuestions = items.map((lesson) => vocabularyQuestions(lesson.items[0])[0]).concat(items.slice(0, 5).map((lesson) => vocabularyQuestions(lesson.items[1])[2]));
   state.vocabQuestionIndex = 0;
   state.vocabAnswers = [];
   openWorkspace('Vocabulary checkpoint', `Checkpoint ${checkpointIndex}`);

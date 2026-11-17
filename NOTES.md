@@ -23,6 +23,7 @@
 - Vocabulary has a clickable word path, Reading has sample books with read-aloud recognition, AI feedback, and questions, and Practice generates a six-question skill test.
 - Questions can answer website-use questions and other harmless questions as a general assistant.
 - Vocabulary lessons are sequential: each lesson has six questions, and completing one unlocks the next dot.
+- Each vocabulary lesson now practices three words through six questions. The path shows lesson numbers and checkpoints without listing the lesson words before the lesson opens.
 - Reading books appear in two columns on larger screens and one column on phones.
 - Vocabulary now has 250 lessons with a 15-question checkpoint after every ten lessons, and Reading now has 20 sample passages.
 - Each reading passage now has three paragraphs with at least five sentences per paragraph.
