@@ -268,17 +268,17 @@ function vocabularyQuestions(item) {
   const otherWords = vocabularySeeds.filter(([word]) => word !== item.word).map(([word]) => word);
   const otherMeanings = vocabularySeeds.filter(([word]) => word !== item.word).map(([, meaning]) => meaning);
   const makeQuestion = (prompt, choices, questionNumber) => {
-    const shift = (item.word.length * 3 + questionNumber * 2) % choices.length;
+    const shift = ((item.word.length * 3 + questionNumber * 2) % (choices.length - 1)) + 1;
     const orderedChoices = choices.slice(shift).concat(choices.slice(0, shift));
     return { prompt, choices: orderedChoices, answer: (choices.length - shift) % choices.length };
   };
   return [
-    makeQuestion(`In this sentence, what does “${item.word}” most likely mean? “The teacher explained that ${item.word} means ${item.meaning}.”`, [item.meaning, otherMeanings[0], otherMeanings[1], otherMeanings[2]], 0),
-    makeQuestion(`Which situation best shows the meaning of “${item.word}”?`, [`A person does something that ${item.meaning}.`, `A person does something that ${otherMeanings[3]}.`, `A person does something that ${otherMeanings[4]}.`, `A person does something that ${otherMeanings[5]}.`], 1),
-    makeQuestion(`Choose the word that best completes this sentence: “The author used ___ to describe something that ${item.meaning}.”`, [item.word, otherWords[0], otherWords[1], otherWords[2]], 2),
-    makeQuestion(`Which definition would belong in a vocabulary notebook for “${item.word}”?`, [item.meaning, otherMeanings[6], otherMeanings[7], otherMeanings[8]], 3),
-    makeQuestion(`Which clue would help a reader figure out “${item.word}” in a new passage?`, [`A nearby sentence explains that something ${item.meaning}.`, `A nearby sentence describes something that ${otherMeanings[9]}.`, `A nearby sentence describes something that ${otherMeanings[10]}.`, `A nearby sentence describes something that ${otherMeanings[11]}.`], 4),
-    makeQuestion(`Which sentence uses “${item.word}” in a way that matches its meaning?`, [`The class discussed how something could ${item.meaning}.`, `The class discussed how something could ${otherMeanings[12]}.`, `The class discussed how something could ${otherMeanings[13]}.`, `The class discussed how something could ${otherMeanings[14]}.`], 5)
+    makeQuestion(`Which vocabulary word best matches this description: “${item.meaning}”?`, [item.word, otherWords[0], otherWords[1], otherWords[2]], 0),
+    makeQuestion(`Which sentence uses “${item.word}” correctly?`, [`The writer used “${item.word}” to describe something that ${item.meaning}.`, `The writer used “${item.word}” as the name of a color.`, `The writer used “${item.word}” to mean yesterday.`, `The writer used “${item.word}” as the name of a place.`], 1),
+    makeQuestion(`What idea is communicated when an author uses the word “${item.word}”?`, [item.meaning, otherMeanings[3], otherMeanings[4], otherMeanings[5]], 2),
+    makeQuestion(`Which situation is the best example of “${item.word}”?`, [`A person encounters something that ${item.meaning}.`, `A person encounters something that ${otherMeanings[6]}.`, `A person encounters something that ${otherMeanings[7]}.`, `A person encounters something that ${otherMeanings[8]}.`], 3),
+    makeQuestion(`Choose the word that best completes this sentence: “The author chose ___ because the passage described something that ${item.meaning}.”`, [item.word, otherWords[3], otherWords[4], otherWords[5]], 4),
+    makeQuestion(`Which meaning should a reader infer from “${item.word}” in a new passage?`, [item.meaning, otherMeanings[9], otherMeanings[10], otherMeanings[11]], 5)
   ];
 }
 
