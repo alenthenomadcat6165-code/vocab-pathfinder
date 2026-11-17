@@ -76,6 +76,18 @@ let state = { mode: null, questions: [], index: 0, answers: [], level: 'Not meas
 let speechRecognition = null;
 const $ = (selector) => document.querySelector(selector);
 const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:3000' : '';
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+
+function normalizePracticeQuestions(data) {
+  if (!Array.isArray(data?.questions) || data.questions.length < 6) throw new Error('The AI returned fewer than six questions. Try again.');
+  const questions = data.questions.slice(0, 6).map((question) => {
+    const choices = Array.isArray(question.choices) ? question.choices.map((choice) => typeof choice === 'object' ? choice.option || choice.text || choice.label || choice.value || '' : choice).map(String).slice(0, 4) : [];
+    const answer = Number(question.answer);
+    if (choices.length !== 4 || !Number.isInteger(answer) || answer < 0 || answer > 3) throw new Error('The AI returned an incomplete question. Try again.');
+    return { skill: String(question.skill || 'General English'), prompt: String(question.prompt || 'Choose the best answer.'), choices, answer, explanation: String(question.explanation || 'Review the answer and try the next question.') };
+  });
+  return questions;
+}
 
 function renderProgress() {
   const progress = window.progressStore.loadProgress();
@@ -104,6 +116,7 @@ function startAssessment() { state = { mode: 'initial', questions: initialQuesti
 
 function renderQuestion() {
   const question = state.questions[state.index];
+  if (!question) return showWorkspaceError('This question could not be loaded. Please return to the home page and try again.');
   $('#question-count').textContent = `${state.index + 1} / ${state.questions.length}`;
   $('#workspace-content').innerHTML = `<div class="question"><h3>${question.prompt}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${choice}</button>`).join('')}</div><div class="action-row"><span class="small-note">Select one answer.</span><button class="primary" id="next-question" disabled>${state.index === state.questions.length - 1 ? 'Continue' : 'Next'} <span>→</span></button></div></div>`;
   let selected = null;
@@ -150,7 +163,7 @@ async function sendMessage(message) {
   const sendButton = $('#chat-send');
   if (sendButton) sendButton.disabled = true;
   try {
-    const response = await fetch(`${API_BASE}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, context: state.chatContext || '', history: state.chatHistory || [] }) });
+    const response = await fetch(`${API_BASE}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, context: state.chatContext || '', history: state.chatHistory || [] }), signal: AbortSignal.timeout(50000) });
     const data = await response.json();
     const thinking = [...document.querySelectorAll('.bubble.guide')].pop();
     if (thinking) thinking.textContent = data.answer || data.error || 'The guide could not answer.';
@@ -228,6 +241,7 @@ function showReadingPage() {
 
 function openBook(index) {
   const book = readingBooks[index];
+  if (!book) return showWorkspaceError('That reading selection could not be opened. Please choose another one.');
   state.currentBook = book;
   state.readingTranscript = '';
   openWorkspace('Reading', book.title);
@@ -256,11 +270,11 @@ function startReadingAloud() {
   recognition.onresult = (event) => { state.readingTranscript = Array.from(event.results).map((result) => result[0].transcript).join(' '); $('#reading-transcript').textContent = state.readingTranscript; $('#rate-reading').disabled = !state.readingTranscript.trim(); };
   recognition.onerror = () => { $('#speech-status').textContent = 'Speech recognition stopped.'; $('#start-reading').disabled = false; $('#stop-reading').disabled = true; };
   recognition.onend = () => { $('#speech-status').textContent = state.readingTranscript ? 'Transcript ready' : 'No recording'; $('#start-reading').disabled = false; $('#stop-reading').disabled = true; if (state.readingTranscript.trim()) unlockReadingQuestions(); };
-  recognition.start();
+  try { recognition.start(); } catch { $('#speech-status').textContent = 'The microphone could not start. Check browser microphone permission and try again.'; $('#start-reading').disabled = false; $('#stop-reading').disabled = true; }
 }
 
-function stopReadingAloud() { if (speechRecognition) speechRecognition.stop(); }
-async function rateReading() { const feedback = $('#reading-feedback'); feedback.textContent = 'Rating…'; $('#rate-reading').disabled = true; try { const response = await fetch(`${API_BASE}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Rate this read-aloud transcript for a middle-school English learner. Give a short, kind score from 1 to 5 for fluency and one specific next practice tip.', context: `Book passage: ${state.currentBook.passage}\nStudent transcript: ${state.readingTranscript}` }) }); const data = await response.json(); feedback.textContent = data.answer || data.error || 'No rating available.'; } catch { feedback.textContent = 'The reading rating is unavailable.'; } finally { $('#rate-reading').disabled = false; } }
+function stopReadingAloud() { try { if (speechRecognition) speechRecognition.stop(); } catch { $('#speech-status').textContent = 'The recording could not be stopped. Try again.'; } }
+async function rateReading() { const feedback = $('#reading-feedback'); feedback.textContent = 'Rating…'; $('#rate-reading').disabled = true; try { const response = await fetch(`${API_BASE}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Rate this read-aloud transcript for a middle-school English learner. Give a short, kind score from 1 to 5 for fluency and one specific next practice tip.', context: `Book passage: ${state.currentBook.passage}\nStudent transcript: ${state.readingTranscript}` }), signal: AbortSignal.timeout(50000) }); const data = await response.json(); feedback.textContent = data.answer || data.error || 'No rating available.'; } catch { feedback.textContent = 'The reading rating is unavailable.'; } finally { $('#rate-reading').disabled = false; } }
 
 async function startAiPractice(type = 'mixed') {
   if (type === 'ai') type = 'mixed';
@@ -272,10 +286,10 @@ async function startAiPractice(type = 'mixed') {
   $('#question-count').textContent = 'Thinking…';
   $('#workspace-content').innerHTML = '<div class="result"><h3>Generating questions.</h3><p>Six multiple-choice questions are being prepared.</p></div>';
   try {
-    const response = await fetch(`${API_BASE}/api/practice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: type === 'test' ? 'Not assessed yet' : progress.latestLevel, type: type === 'test' ? 'mixed' : type, weakSkills: progress.weakSkills || {} }) });
+    const response = await fetch(`${API_BASE}/api/practice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: type === 'test' ? 'Not assessed yet' : progress.latestLevel, type: type === 'test' ? 'mixed' : type, weakSkills: progress.weakSkills || {} }), signal: AbortSignal.timeout(50000) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'The AI could not make practice right now.');
-    state.questions = data.questions;
+    state.questions = normalizePracticeQuestions(data);
     state.passage = data.passage;
     state.index = 0;
     state.answers = [];
@@ -291,17 +305,26 @@ async function startAiPractice(type = 'mixed') {
 
 function renderAiQuestion() {
   const question = state.questions[state.index];
-  $('#question-count').textContent = `${state.index + 1} / 6`;
-  const passage = state.passage && state.index === 0 ? `<div class="result"><p><strong>Read this first:</strong> ${state.passage}</p></div>` : '';
-  $('#workspace-content').innerHTML = `${passage}<div class="question"><h3>${question.prompt}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${choice}</button>`).join('')}</div><div class="action-row"><button class="secondary" id="ask-current-question">Ask about question</button><button class="primary" id="next-question" disabled>${state.index === 5 ? 'Finish' : 'Next'} <span>→</span></button></div><p class="small-note">Select one answer.</p></div>`;
+  if (!question) return showWorkspaceError('This practice question could not be loaded. Please generate a new set.');
+  const questionCount = state.questions.length;
+  $('#question-count').textContent = `${state.index + 1} / ${questionCount}`;
+  const passage = state.passage && state.index === 0 ? `<div class="result"><p><strong>Read this first:</strong> ${escapeHtml(state.passage)}</p></div>` : '';
+  $('#workspace-content').innerHTML = `${passage}<div class="question"><h3>${escapeHtml(question.prompt)}</h3><div class="choice-grid">${question.choices.map((choice, index) => `<button class="choice" data-choice="${index}">${escapeHtml(choice)}</button>`).join('')}</div><div class="action-row"><button class="secondary" id="ask-current-question">Ask about question</button><button class="primary" id="next-question" disabled>${state.index === questionCount - 1 ? 'Finish' : 'Next'} <span>→</span></button></div><p class="small-note">Select one answer.</p></div>`;
   let selected = null;
   $('#ask-current-question').addEventListener('click', () => { state.chatContext = `Practice type: ${state.practiceType || 'personal path'}\nQuestion ${state.index + 1} of 6: ${question.prompt}\nChoices: ${question.choices.join(' | ')}\nThe student wants help with this exact question. Give a hint or explain the skill without giving away the answer unless they ask for the answer.`; openChat(); });
   document.querySelectorAll('[data-choice]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-choice]').forEach((item) => item.classList.remove('selected')); button.classList.add('selected'); selected = Number(button.dataset.choice); $('#next-question').disabled = false; }));
-  $('#next-question').addEventListener('click', () => { state.answers.push(selected); state.explanations.push(question.explanation); state.index += 1; if (state.index < 6) renderAiQuestion(); else finishAiPractice(); });
+  $('#next-question').addEventListener('click', () => { state.answers.push(selected); state.explanations.push(question.explanation); state.index += 1; if (state.index < questionCount) renderAiQuestion(); else finishAiPractice(); });
+}
+
+function showWorkspaceError(message) {
+  $('#question-count').textContent = 'Needs attention';
+  $('#workspace-content').innerHTML = `<div class="result"><h3>Something went wrong.</h3><p>${escapeHtml(message)}</p></div>`;
 }
 
 function finishAiPractice() {
-  const score = Math.round((state.answers.filter((answer, index) => answer === state.questions[index].answer).length / 6) * 100);
+  const questionCount = state.questions.length;
+  const correctCount = state.answers.filter((answer, index) => answer === state.questions[index]?.answer).length;
+  const score = questionCount ? Math.round((correctCount / questionCount) * 100) : 0;
   const progress = window.progressStore.loadProgress();
   const weakSkills = { ...(progress.weakSkills || {}) };
   state.questions.forEach((question, index) => { if (state.answers[index] !== question.answer) { const skill = question.skill || state.practiceType || 'General English'; weakSkills[skill] = (weakSkills[skill] || 0) + 1; } });
@@ -312,8 +335,8 @@ function finishAiPractice() {
   $('#question-count').textContent = 'Complete';
   const review = state.questions.map((question, index) => `Q${index + 1}: ${question.prompt} Student choice: ${question.choices[state.answers[index]] || 'none'}. Correct choice: ${question.choices[question.answer]}.`).join('\n');
   const missed = state.questions.map((question, index) => ({ question, index })).filter(({ question, index }) => state.answers[index] !== question.answer);
-  const reviewItems = missed.length ? missed.map(({ question, index }) => `<div class="review-item"><strong>Question ${index + 1}</strong><p>${question.prompt}</p><p class="wrong-answer">Your answer: ${question.choices[state.answers[index]] || 'No answer'}</p><p class="right-answer">Right answer: ${question.choices[question.answer]}</p><p>${question.explanation}</p></div>`).join('') : '<p>All six answers were correct.</p>';
-  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${state.answers.filter((answer, index) => answer === state.questions[index].answer).length} out of ${state.questions.length}.</p><h3>Review</h3><div class="review-list">${reviewItems}</div><div class="action-row"><button class="secondary" id="review-button">Review with assistant →</button><button class="secondary" id="again-button">Generate another set →</button></div></div>`;
+  const reviewItems = missed.length ? missed.map(({ question, index }) => `<div class="review-item"><strong>Question ${index + 1}</strong><p>${escapeHtml(question.prompt)}</p><p class="wrong-answer">Your answer: ${escapeHtml(question.choices[state.answers[index]] || 'No answer')}</p><p class="right-answer">Right answer: ${escapeHtml(question.choices[question.answer])}</p><p>${escapeHtml(question.explanation)}</p></div>`).join('') : `<p>All ${questionCount} answers were correct.</p>`;
+  $('#workspace-content').innerHTML = `<div class="result"><h3>${score}% correct</h3><p>You scored ${correctCount} out of ${questionCount}.</p><h3>Review</h3><div class="review-list">${reviewItems}</div><div class="action-row"><button class="secondary" id="review-button">Review with assistant →</button><button class="secondary" id="again-button">Generate another set →</button></div></div>`;
   $('#review-button').addEventListener('click', () => { state.chatContext = `The student just completed a connected six-question ${state.practiceType || 'personal'} practice. Here is the review:\n${review}\nHelp the student notice patterns and choose what to practice next.`; openChat(); });
   $('#again-button').addEventListener('click', () => startAiPractice(state.practiceType));
 }

@@ -21,7 +21,7 @@ async function ollamaRequest(endpoint, options = {}) {
     return await fetch(`${OLLAMA_BASE_URL}${endpoint}`, {
       ...options,
       headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-      signal: AbortSignal.timeout(90000)
+      signal: AbortSignal.timeout(45000)
     });
   } catch (error) {
     const offline = new Error('Ollama is not running. Start Ollama, then try again.');
@@ -95,9 +95,8 @@ async function createPractice({ level, type, weakSkills = {} }) {
   const weakFocus = Object.entries(weakSkills).filter(([, score]) => Number(score) > 0).sort((a, b) => Number(b[1]) - Number(a[1])).map(([skill, count]) => `${skill} (${count} missed)`).join(', ');
   const targetedInstruction = weakFocus ? `The student has struggled most with ${weakFocus}. Include at least 3 of the 6 questions about the most-missed skill, while still keeping the set varied.` : 'Spread the questions across the relevant skills.';
   const prompt = `Create exactly 6 ${focus} multiple-choice problems for a middle-school student at the estimated English level “${level}”. These should feel like real questions from a thoughtful school workbook: use short passages, clear situations, sentence editing, inference, context clues, or meaningful examples instead of repeated definitions. Every question must test a different idea, and all four choices must be plausible but clearly different; never repeat a choice or make two choices nearly identical. ${targetedInstruction} Return ONLY valid JSON with this shape: {"title":"short title","passage":"optional short passage, empty string if not needed","questions":[{"skill":"Vocabulary|Grammar|Reading|Spelling","prompt":"question","choices":["choice 1","choice 2","choice 3","choice 4"],"answer":0,"explanation":"short kind explanation"}]}. The answer must be a number from 0 to 3. Do not ask the student to type a response. Do not include markdown fences or any text outside the JSON.`;
-  const retryPrompt = `Return a JSON object with exactly 6 different workbook-style questions now. Each question must have a skill, prompt, exactly 4 distinct choices, a numeric answer from 0 to 3, and a short explanation. Topic: ${focus}. Student level: ${level}. ${targetedInstruction}`;
   let lastError;
-  for (const request of [prompt, retryPrompt]) {
+  for (const request of [prompt]) {
     try {
       const raw = await askOllama(request, '', [], true);
       const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
