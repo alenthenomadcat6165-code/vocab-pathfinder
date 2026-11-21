@@ -39,6 +39,7 @@
 - GitHub Pages publishes the `public/` website through `.github/workflows/pages.yml`. GitHub Pages can serve the interface, but it cannot run the Node backend; use the Vercel deployment for AI features.
 - Vocabulary questions use varied context-clue, situation, cloze, definition, clue-selection, and sentence-use formats. The question design follows the approach described by [iRead's vocabulary-in-context guide](https://iread.education/resources/reading-quizzes/vocabulary-in-context-questions), without copying protected textbook questions.
 - Score feedback uses four cat images supplied for the project; the score message is shown beside the matching photo.
+- The MindDo key can access the OpenAI model `gpt-5.6-luna`.
 
 ## Maybe Later
 
