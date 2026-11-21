@@ -627,6 +627,13 @@ function setupPetBall() {
       const currentY = parseFloat(ball.style.top) || 0;
       const maxX = window.innerWidth - ball.offsetWidth;
       const maxY = window.innerHeight - ball.offsetHeight;
+      if (currentY >= maxY - 0.5 && Math.abs(velocityY) < 1 && Math.abs(velocityX) < 0.1) {
+        velocityX = 0;
+        velocityY = 0;
+        setPosition(currentX, maxY);
+        animationFrame = requestAnimationFrame(step);
+        return;
+      }
       let nextX = currentX + velocityX;
       let nextY = currentY + velocityY;
       if (nextX <= 0 || nextX >= maxX) { velocityX *= -0.72; nextX = Math.max(0, Math.min(maxX, nextX)); }
@@ -657,8 +664,7 @@ function setupPetBall() {
       setPosition(nextX, nextY);
       velocityX *= 0.985;
       velocityY = velocityY * 0.985 + 0.35;
-      if (Math.abs(velocityX) + Math.abs(velocityY) > 0.65) animationFrame = requestAnimationFrame(step);
-      else animationFrame = 0;
+      animationFrame = requestAnimationFrame(step);
     };
     stopMotion();
     animationFrame = requestAnimationFrame(step);
@@ -758,6 +764,7 @@ function setupPetBall() {
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
   setPosition(window.innerWidth - 140, window.innerHeight - 120);
+  throwBall();
 }
 
 setupPetBall();
