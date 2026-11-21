@@ -500,6 +500,7 @@ function advanceSecretSequence(page) {
 }
 
 function showSecretPage() {
+  document.body.classList.add('secret-mode');
   document.querySelectorAll('.top-tab').forEach((button) => button.classList.remove('active'));
   $('#home-content').classList.add('hidden');
   openWorkspace('Hidden page', 'A quiet corner');
@@ -509,6 +510,7 @@ function showSecretPage() {
 }
 
 function showPage(page) {
+  document.body.classList.remove('secret-mode');
   document.querySelectorAll('.top-tab').forEach((button) => button.classList.toggle('active', button.dataset.page === page));
   if (page === 'home') { $('#home-content').classList.remove('hidden'); $('#workspace').classList.add('hidden'); return; }
   $('#home-content').classList.add('hidden');
