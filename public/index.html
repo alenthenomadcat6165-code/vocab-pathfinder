@@ -50,10 +50,10 @@
     <aside class="pet-corner" aria-label="Sleeping pet">
       <div class="pet-sleep-zs" aria-hidden="true"><span>Z</span><span>Z</span><span>Z</span></div>
       <img class="pet-cat" src="pet-cat.webp" alt="Sleeping cat pet" />
-      <div class="pet-ball-area" id="pet-ball-area">
-        <button class="pet-ball" id="pet-ball" type="button" aria-label="Blue ball. Drag or throw it"> </button>
-      </div>
+      <button class="pet-line-button" id="pet-line-toggle" type="button" aria-pressed="false">Line</button>
+      <button class="pet-ball" id="pet-ball" type="button" aria-label="Blue ball. Drag or throw it"> </button>
     </aside>
+    <canvas class="pet-line-canvas" id="pet-line-canvas" aria-hidden="true"></canvas>
     <script src="storage.js"></script><script src="app.js"></script>
   </body>
 </html>

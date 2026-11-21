@@ -529,9 +529,16 @@ $('#start-reading-check').addEventListener('click', startReadingLevelCheck);
 renderProgress(); refreshStatus();
 
 function setupPetBall() {
-  const area = $('#pet-ball-area');
   const ball = $('#pet-ball');
-  if (!area || !ball) return;
+  const lineButton = $('#pet-line-toggle');
+  const canvas = $('#pet-line-canvas');
+  if (!ball || !lineButton || !canvas) return;
+  document.body.appendChild(ball);
+  const context = canvas.getContext('2d');
+  const lines = [];
+  let previewLine = null;
+  let lineMode = false;
+  let drawingLine = false;
   let dragging = false;
   let pointerId = null;
   let offsetX = 0;
@@ -543,16 +550,42 @@ function setupPetBall() {
   let velocityY = 0;
   let animationFrame = 0;
 
-  function setPosition(x, y) {
-    const maxX = area.clientWidth - ball.offsetWidth;
-    const maxY = area.clientHeight - ball.offsetHeight;
-    ball.style.left = `${Math.max(0, Math.min(maxX, x))}px`;
-    ball.style.top = `${Math.max(0, Math.min(maxY, y))}px`;
+  function resizeCanvas() {
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * ratio;
+    canvas.height = window.innerHeight * ratio;
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    drawLines();
   }
 
-  function pointInArea(event) {
-    const bounds = area.getBoundingClientRect();
-    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+  function drawLines() {
+    context.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    context.strokeStyle = '#4d9cf2';
+    context.lineWidth = 4;
+    context.lineCap = 'round';
+    [...lines, ...(previewLine ? [previewLine] : [])].forEach((line) => {
+      context.beginPath();
+      context.moveTo(line.x1, line.y1);
+      context.lineTo(line.x2, line.y2);
+      context.stroke();
+    });
+  }
+
+  function pointFromEvent(event) {
+    return { x: event.clientX, y: event.clientY };
+  }
+
+  function isControlTarget(target) {
+    return target instanceof Element && Boolean(target.closest('button, a, input, textarea, select, label'));
+  }
+
+  function setPosition(x, y) {
+    const maxX = window.innerWidth - ball.offsetWidth;
+    const maxY = window.innerHeight - ball.offsetHeight;
+    ball.style.left = `${Math.max(0, Math.min(maxX, x))}px`;
+    ball.style.top = `${Math.max(0, Math.min(maxY, y))}px`;
   }
 
   function stopMotion() {
@@ -564,16 +597,41 @@ function setupPetBall() {
     const step = () => {
       const currentX = parseFloat(ball.style.left) || 0;
       const currentY = parseFloat(ball.style.top) || 0;
-      const maxX = area.clientWidth - ball.offsetWidth;
-      const maxY = area.clientHeight - ball.offsetHeight;
+      const maxX = window.innerWidth - ball.offsetWidth;
+      const maxY = window.innerHeight - ball.offsetHeight;
       let nextX = currentX + velocityX;
       let nextY = currentY + velocityY;
       if (nextX <= 0 || nextX >= maxX) { velocityX *= -0.72; nextX = Math.max(0, Math.min(maxX, nextX)); }
       if (nextY <= 0 || nextY >= maxY) { velocityY *= -0.72; nextY = Math.max(0, Math.min(maxY, nextY)); }
+      const radius = ball.offsetWidth / 2;
+      const center = { x: nextX + radius, y: nextY + radius };
+      lines.forEach((line) => {
+        const dx = line.x2 - line.x1;
+        const dy = line.y2 - line.y1;
+        const lengthSquared = dx * dx + dy * dy || 1;
+        const amount = Math.max(0, Math.min(1, ((center.x - line.x1) * dx + (center.y - line.y1) * dy) / lengthSquared));
+        const closest = { x: line.x1 + amount * dx, y: line.y1 + amount * dy };
+        const distanceX = center.x - closest.x;
+        const distanceY = center.y - closest.y;
+        const distance = Math.hypot(distanceX, distanceY);
+        if (distance < radius + 4 && distance > 0) {
+          const normalX = distanceX / distance;
+          const normalY = distanceY / distance;
+          const towardLine = velocityX * normalX + velocityY * normalY;
+          if (towardLine < 0) {
+            velocityX -= 2 * towardLine * normalX;
+            velocityY -= 2 * towardLine * normalY;
+            velocityX *= 0.9;
+            velocityY *= 0.9;
+            nextX += normalX * (radius + 5 - distance);
+            nextY += normalY * (radius + 5 - distance);
+          }
+        }
+      });
       setPosition(nextX, nextY);
-      velocityX *= 0.94;
-      velocityY = velocityY * 0.94 + 0.22;
-      if (Math.abs(velocityX) + Math.abs(velocityY) > 0.8) animationFrame = requestAnimationFrame(step);
+      velocityX *= 0.985;
+      velocityY = velocityY * 0.985 + 0.35;
+      if (Math.abs(velocityX) + Math.abs(velocityY) > 0.65) animationFrame = requestAnimationFrame(step);
       else animationFrame = 0;
     };
     stopMotion();
@@ -586,7 +644,7 @@ function setupPetBall() {
     dragging = true;
     pointerId = event.pointerId;
     ball.setPointerCapture(pointerId);
-    const point = pointInArea(event);
+    const point = pointFromEvent(event);
     offsetX = point.x - (parseFloat(ball.style.left) || 0);
     offsetY = point.y - (parseFloat(ball.style.top) || 0);
     lastX = point.x;
@@ -599,7 +657,7 @@ function setupPetBall() {
 
   ball.addEventListener('pointermove', (event) => {
     if (!dragging || event.pointerId !== pointerId) return;
-    const point = pointInArea(event);
+    const point = pointFromEvent(event);
     const now = performance.now();
     const elapsed = Math.max(1, now - lastTime);
     velocityX = (point.x - lastX) / elapsed * 16;
@@ -620,7 +678,37 @@ function setupPetBall() {
   }
   ball.addEventListener('pointerup', release);
   ball.addEventListener('pointercancel', release);
-  setPosition(18, 66);
+  lineButton.addEventListener('click', () => {
+    lineMode = !lineMode;
+    lineButton.setAttribute('aria-pressed', String(lineMode));
+    lineButton.classList.toggle('active', lineMode);
+    canvas.classList.toggle('drawing-mode', lineMode);
+    if (!lineMode) { drawingLine = false; previewLine = null; drawLines(); }
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (!lineMode || isControlTarget(event.target) || event.target === ball) return;
+    const point = pointFromEvent(event);
+    drawingLine = true;
+    previewLine = { x1: point.x, y1: point.y, x2: point.x, y2: point.y };
+    drawLines();
+  }, true);
+  document.addEventListener('pointermove', (event) => {
+    if (!drawingLine) return;
+    const point = pointFromEvent(event);
+    previewLine.x2 = point.x;
+    previewLine.y2 = point.y;
+    drawLines();
+  }, true);
+  document.addEventListener('pointerup', () => {
+    if (!drawingLine) return;
+    drawingLine = false;
+    if (previewLine && Math.hypot(previewLine.x2 - previewLine.x1, previewLine.y2 - previewLine.y1) > 18) lines.push(previewLine);
+    previewLine = null;
+    drawLines();
+  }, true);
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+  setPosition(window.innerWidth - 140, window.innerHeight - 120);
 }
 
 setupPetBall();
