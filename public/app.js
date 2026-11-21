@@ -485,6 +485,29 @@ function showProgressPage() {
   $('#workspace-content').innerHTML = `<div class="result"><h3>${progress.latestLevel}</h3><p>Sessions: ${progress.sessions}</p><p>Vocabulary: ${progress.vocabularyScore == null ? 'Not started' : `${progress.vocabularyScore}%`}</p><p>Reading: ${progress.readingScore == null ? 'Not started' : `${progress.readingScore}%`}</p></div>`;
 }
 
+let secretStep = 0;
+function advanceSecretSequence(page) {
+  const expected = secretStep < 10 ? 'home' : secretStep < 15 ? 'vocabulary' : 'progress';
+  if (page !== expected) {
+    secretStep = page === 'home' ? 1 : 0;
+    return false;
+  }
+  secretStep += 1;
+  if (secretStep < 23) return false;
+  secretStep = 0;
+  showSecretPage();
+  return true;
+}
+
+function showSecretPage() {
+  document.querySelectorAll('.top-tab').forEach((button) => button.classList.remove('active'));
+  $('#home-content').classList.add('hidden');
+  openWorkspace('Hidden page', 'A quiet corner');
+  $('#question-count').textContent = 'Found';
+  $('#workspace-content').innerHTML = `<button class="primary secret-home-button" id="secret-home">Return to Home ${icon('home')}</button><div class="result secret-page"><h3>You found the hidden page.</h3><p>This page is separate from the learning path.</p></div>`;
+  $('#secret-home').addEventListener('click', () => showPage('home'));
+}
+
 function showPage(page) {
   document.querySelectorAll('.top-tab').forEach((button) => button.classList.toggle('active', button.dataset.page === page));
   if (page === 'home') { $('#home-content').classList.remove('hidden'); $('#workspace').classList.add('hidden'); return; }
@@ -496,7 +519,11 @@ function showPage(page) {
   if (page === 'progress') return showProgressPage();
 }
 
-document.querySelectorAll('.top-tab').forEach((button) => button.addEventListener('click', () => showPage(button.dataset.page)));
+document.querySelectorAll('.top-tab').forEach((button) => button.addEventListener('click', () => {
+  const page = button.dataset.page;
+  if (advanceSecretSequence(page)) return;
+  showPage(page);
+}));
 $('#refresh-status').addEventListener('click', refreshStatus);
 $('#start-reading-check').addEventListener('click', startReadingLevelCheck);
 renderProgress(); refreshStatus();
