@@ -527,3 +527,100 @@ document.querySelectorAll('.top-tab').forEach((button) => button.addEventListene
 $('#refresh-status').addEventListener('click', refreshStatus);
 $('#start-reading-check').addEventListener('click', startReadingLevelCheck);
 renderProgress(); refreshStatus();
+
+function setupPetBall() {
+  const area = $('#pet-ball-area');
+  const ball = $('#pet-ball');
+  if (!area || !ball) return;
+  let dragging = false;
+  let pointerId = null;
+  let offsetX = 0;
+  let offsetY = 0;
+  let lastX = 0;
+  let lastY = 0;
+  let lastTime = 0;
+  let velocityX = 0;
+  let velocityY = 0;
+  let animationFrame = 0;
+
+  function setPosition(x, y) {
+    const maxX = area.clientWidth - ball.offsetWidth;
+    const maxY = area.clientHeight - ball.offsetHeight;
+    ball.style.left = `${Math.max(0, Math.min(maxX, x))}px`;
+    ball.style.top = `${Math.max(0, Math.min(maxY, y))}px`;
+  }
+
+  function pointInArea(event) {
+    const bounds = area.getBoundingClientRect();
+    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+  }
+
+  function stopMotion() {
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    animationFrame = 0;
+  }
+
+  function throwBall() {
+    const step = () => {
+      const currentX = parseFloat(ball.style.left) || 0;
+      const currentY = parseFloat(ball.style.top) || 0;
+      const maxX = area.clientWidth - ball.offsetWidth;
+      const maxY = area.clientHeight - ball.offsetHeight;
+      let nextX = currentX + velocityX;
+      let nextY = currentY + velocityY;
+      if (nextX <= 0 || nextX >= maxX) { velocityX *= -0.72; nextX = Math.max(0, Math.min(maxX, nextX)); }
+      if (nextY <= 0 || nextY >= maxY) { velocityY *= -0.72; nextY = Math.max(0, Math.min(maxY, nextY)); }
+      setPosition(nextX, nextY);
+      velocityX *= 0.94;
+      velocityY = velocityY * 0.94 + 0.22;
+      if (Math.abs(velocityX) + Math.abs(velocityY) > 0.8) animationFrame = requestAnimationFrame(step);
+      else animationFrame = 0;
+    };
+    stopMotion();
+    animationFrame = requestAnimationFrame(step);
+  }
+
+  ball.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    stopMotion();
+    dragging = true;
+    pointerId = event.pointerId;
+    ball.setPointerCapture(pointerId);
+    const point = pointInArea(event);
+    offsetX = point.x - (parseFloat(ball.style.left) || 0);
+    offsetY = point.y - (parseFloat(ball.style.top) || 0);
+    lastX = point.x;
+    lastY = point.y;
+    lastTime = performance.now();
+    velocityX = 0;
+    velocityY = 0;
+    ball.classList.add('being-dragged');
+  });
+
+  ball.addEventListener('pointermove', (event) => {
+    if (!dragging || event.pointerId !== pointerId) return;
+    const point = pointInArea(event);
+    const now = performance.now();
+    const elapsed = Math.max(1, now - lastTime);
+    velocityX = (point.x - lastX) / elapsed * 16;
+    velocityY = (point.y - lastY) / elapsed * 16;
+    setPosition(point.x - offsetX, point.y - offsetY);
+    lastX = point.x;
+    lastY = point.y;
+    lastTime = now;
+  });
+
+  function release(event) {
+    if (!dragging || event.pointerId !== pointerId) return;
+    dragging = false;
+    ball.classList.remove('being-dragged');
+    ball.releasePointerCapture(pointerId);
+    pointerId = null;
+    throwBall();
+  }
+  ball.addEventListener('pointerup', release);
+  ball.addEventListener('pointercancel', release);
+  setPosition(18, 66);
+}
+
+setupPetBall();
