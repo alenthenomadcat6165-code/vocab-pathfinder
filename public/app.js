@@ -531,13 +531,15 @@ renderProgress(); refreshStatus();
 function setupPetBall() {
   const ball = $('#pet-ball');
   const lineButton = $('#pet-line-toggle');
+  const deleteButton = $('#pet-delete-lines');
   const canvas = $('#pet-line-canvas');
-  if (!ball || !lineButton || !canvas) return;
+  if (!ball || !lineButton || !deleteButton || !canvas) return;
   document.body.appendChild(ball);
   const context = canvas.getContext('2d');
   const lines = [];
   let previewLine = null;
   let lineMode = false;
+  let deleteMode = false;
   let drawingLine = false;
   let dragging = false;
   let pointerId = null;
@@ -562,7 +564,7 @@ function setupPetBall() {
 
   function drawLines() {
     context.clearRect(0, 0, window.innerWidth, window.innerHeight);
-    context.strokeStyle = '#4d9cf2';
+    context.strokeStyle = '#20252b';
     context.lineWidth = 4;
     context.lineCap = 'round';
     [...lines, ...(previewLine ? [previewLine] : [])].forEach((line) => {
@@ -579,6 +581,30 @@ function setupPetBall() {
 
   function isControlTarget(target) {
     return target instanceof Element && Boolean(target.closest('button, a, input, textarea, select, label'));
+  }
+
+  function distanceToSegment(point, segment) {
+    const dx = segment.x2 - segment.x1;
+    const dy = segment.y2 - segment.y1;
+    const lengthSquared = dx * dx + dy * dy || 1;
+    const amount = Math.max(0, Math.min(1, ((point.x - segment.x1) * dx + (point.y - segment.y1) * dy) / lengthSquared));
+    return Math.hypot(point.x - (segment.x1 + amount * dx), point.y - (segment.y1 + amount * dy));
+  }
+
+  function orientation(a, b, c) { return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x); }
+  function segmentsIntersect(a, b, c, d) {
+    const first = orientation(a, b, c);
+    const second = orientation(a, b, d);
+    const third = orientation(c, d, a);
+    const fourth = orientation(c, d, b);
+    return ((first > 0 && second < 0) || (first < 0 && second > 0)) && ((third > 0 && fourth < 0) || (third < 0 && fourth > 0));
+  }
+
+  function movingPathTouchesLine(start, end, line, padding) {
+    const lineStart = { x: line.x1, y: line.y1 };
+    const lineEnd = { x: line.x2, y: line.y2 };
+    const path = { x1: start.x, y1: start.y, x2: end.x, y2: end.y };
+    return segmentsIntersect(start, end, lineStart, lineEnd) || distanceToSegment(start, line) <= padding || distanceToSegment(end, line) <= padding || distanceToSegment(lineStart, path) <= padding || distanceToSegment(lineEnd, path) <= padding;
   }
 
   function setPosition(x, y) {
@@ -605,26 +631,24 @@ function setupPetBall() {
       if (nextY <= 0 || nextY >= maxY) { velocityY *= -0.72; nextY = Math.max(0, Math.min(maxY, nextY)); }
       const radius = ball.offsetWidth / 2;
       const center = { x: nextX + radius, y: nextY + radius };
+      const previousCenter = { x: currentX + radius, y: currentY + radius };
       lines.forEach((line) => {
         const dx = line.x2 - line.x1;
         const dy = line.y2 - line.y1;
-        const lengthSquared = dx * dx + dy * dy || 1;
-        const amount = Math.max(0, Math.min(1, ((center.x - line.x1) * dx + (center.y - line.y1) * dy) / lengthSquared));
-        const closest = { x: line.x1 + amount * dx, y: line.y1 + amount * dy };
-        const distanceX = center.x - closest.x;
-        const distanceY = center.y - closest.y;
-        const distance = Math.hypot(distanceX, distanceY);
-        if (distance < radius + 4 && distance > 0) {
-          const normalX = distanceX / distance;
-          const normalY = distanceY / distance;
+        const lineLength = Math.hypot(dx, dy) || 1;
+        let normalX = -dy / lineLength;
+        let normalY = dx / lineLength;
+        if ((center.x - line.x1) * normalX + (center.y - line.y1) * normalY < 0) { normalX *= -1; normalY *= -1; }
+        const touches = movingPathTouchesLine(previousCenter, center, line, radius + 4);
+        if (touches) {
           const towardLine = velocityX * normalX + velocityY * normalY;
           if (towardLine < 0) {
             velocityX -= 2 * towardLine * normalX;
             velocityY -= 2 * towardLine * normalY;
             velocityX *= 0.9;
             velocityY *= 0.9;
-            nextX += normalX * (radius + 5 - distance);
-            nextY += normalY * (radius + 5 - distance);
+            nextX += normalX * (radius + 5);
+            nextY += normalY * (radius + 5);
           }
         }
       });
@@ -680,16 +704,39 @@ function setupPetBall() {
   ball.addEventListener('pointercancel', release);
   lineButton.addEventListener('click', () => {
     lineMode = !lineMode;
+    deleteMode = false;
+    deleteButton.setAttribute('aria-pressed', 'false');
+    deleteButton.classList.remove('active');
     lineButton.setAttribute('aria-pressed', String(lineMode));
     lineButton.classList.toggle('active', lineMode);
     canvas.classList.toggle('drawing-mode', lineMode);
+    document.body.classList.toggle('line-drawing', lineMode);
     if (!lineMode) { drawingLine = false; previewLine = null; drawLines(); }
   });
+  deleteButton.addEventListener('click', () => {
+    deleteMode = !deleteMode;
+    lineMode = false;
+    drawingLine = false;
+    previewLine = null;
+    deleteButton.setAttribute('aria-pressed', String(deleteMode));
+    deleteButton.classList.toggle('active', deleteMode);
+    lineButton.setAttribute('aria-pressed', 'false');
+    lineButton.classList.remove('active');
+    document.body.classList.remove('line-drawing');
+    drawLines();
+  });
   document.addEventListener('pointerdown', (event) => {
+    if (deleteMode && !isControlTarget(event.target) && event.target !== ball) {
+      const point = pointFromEvent(event);
+      const index = lines.findIndex((line) => distanceToSegment(point, line) <= 12);
+      if (index >= 0) { lines.splice(index, 1); drawLines(); event.preventDefault(); }
+      return;
+    }
     if (!lineMode || isControlTarget(event.target) || event.target === ball) return;
     const point = pointFromEvent(event);
     drawingLine = true;
     previewLine = { x1: point.x, y1: point.y, x2: point.x, y2: point.y };
+    event.preventDefault();
     drawLines();
   }, true);
   document.addEventListener('pointermove', (event) => {
