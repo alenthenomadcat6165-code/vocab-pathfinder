@@ -645,17 +645,25 @@ function setupPetBall() {
         const dx = line.x2 - line.x1;
         const dy = line.y2 - line.y1;
         const lineLength = Math.hypot(dx, dy) || 1;
+        const tangentX = dx / lineLength;
+        const tangentY = dy / lineLength;
         let normalX = -dy / lineLength;
         let normalY = dx / lineLength;
         if ((center.x - line.x1) * normalX + (center.y - line.y1) * normalY < 0) { normalX *= -1; normalY *= -1; }
         const touches = movingPathTouchesLine(previousCenter, center, line, radius + 4);
         if (touches) {
+          const gravityAlongRamp = 0.45 * tangentY;
+          velocityX += tangentX * gravityAlongRamp;
+          velocityY += tangentY * gravityAlongRamp;
           const towardLine = velocityX * normalX + velocityY * normalY;
           if (towardLine < 0) {
             velocityX -= 2 * towardLine * normalX;
             velocityY -= 2 * towardLine * normalY;
-            velocityX *= 0.9;
-            velocityY *= 0.9;
+            const normalVelocity = velocityX * normalX + velocityY * normalY;
+            velocityX -= normalVelocity * normalX * 0.45;
+            velocityY -= normalVelocity * normalY * 0.45;
+            velocityX *= 0.995;
+            velocityY *= 0.995;
             nextX += normalX * (radius + 5);
             nextY += normalY * (radius + 5);
           }
@@ -663,7 +671,7 @@ function setupPetBall() {
       });
       setPosition(nextX, nextY);
       velocityX *= 0.985;
-      velocityY = velocityY * 0.985 + 0.35;
+      velocityY = velocityY * 0.985 + 0.45;
       animationFrame = requestAnimationFrame(step);
     };
     stopMotion();
