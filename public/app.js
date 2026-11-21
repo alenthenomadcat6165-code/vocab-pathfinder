@@ -88,6 +88,7 @@ let state = { mode: null, questions: [], index: 0, answers: [], level: 'Not meas
 let speechRecognition = null;
 const $ = (selector) => document.querySelector(selector);
 const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:3000' : '';
+function errorMessage(data, fallback) { return data?.error && typeof data.error === 'object' ? data.error.message : (data?.error || fallback); }
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
 const icon = (name) => `<span class="material-symbols-rounded" aria-hidden="true">${name}</span>`;
 
@@ -131,14 +132,14 @@ function renderProgress() {
 }
 
 async function refreshStatus() {
-  $('#ollama-status').textContent = 'Checking assistant status…';
+  $('#ai-status').textContent = 'Checking assistant status…';
   try {
     const response = await fetch(`${API_BASE}/api/health`);
     const data = await response.json();
-    if (!data.ok) throw new Error(data.error);
-    $('#ollama-status').textContent = 'Ready';
+    if (!data.ok) throw new Error(errorMessage(data, 'AI unavailable'));
+    $('#ai-status').textContent = 'Ready';
   } catch (error) {
-    $('#ollama-status').textContent = window.location.protocol === 'file:' ? 'Run npm start to use AI' : 'Unavailable';
+    $('#ai-status').textContent = window.location.protocol === 'file:' ? 'Run npm start to use the AI' : 'AI unavailable';
   }
 }
 
@@ -194,7 +195,7 @@ async function startReadingLevelCheck() {
   try {
     const response = await fetch(`${API_BASE}/api/practice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: 'Not measured yet', type: 'reading', weakSkills: {} }), signal: AbortSignal.timeout(50000) });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'The reading check is unavailable right now.');
+    if (!response.ok) throw new Error(errorMessage(data, 'The reading check is unavailable right now.'));
     state.questions = normalizePracticeQuestions(data);
     state.passage = data.passage || '';
     state.index = 0;
@@ -237,7 +238,7 @@ async function sendMessage(message) {
     const response = await fetch(`${API_BASE}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, context: state.chatContext || '', history: state.chatHistory || [] }), signal: AbortSignal.timeout(50000) });
     const data = await response.json();
     const thinking = [...document.querySelectorAll('.bubble.guide')].pop();
-    if (thinking) thinking.textContent = data.answer || data.error || 'The guide could not answer.';
+    if (thinking) thinking.textContent = data.answer || errorMessage(data, 'The guide could not answer.');
     if (data.answer) { state.chatHistory = [...(state.chatHistory || []), { role: 'user', content: message }, { role: 'assistant', content: data.answer }].slice(-8); }
   } catch {
     const thinking = [...document.querySelectorAll('.bubble.guide')].pop();
@@ -402,7 +403,7 @@ function startReadingAloud() {
 }
 
 function stopReadingAloud() { try { if (speechRecognition) speechRecognition.stop(); } catch { $('#speech-status').textContent = 'The recording could not be stopped. Try again.'; } }
-async function rateReading() { const feedback = $('#reading-feedback'); feedback.textContent = 'Rating…'; $('#rate-reading').disabled = true; const metrics = readingMetrics(); const coveragePercent = Math.round(metrics.coverage * 100); const score = Math.max(1, Math.min(5, Math.round(((metrics.coverage * 0.7) + (metrics.accuracy * 0.3)) * 5))); $('#reading-score-feedback').innerHTML = scoreFeedbackMarkup(coveragePercent); try { const response = await fetch(`${API_BASE}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Give kind, specific feedback on this read-aloud. Do not invent a score; use the measured passage coverage and word-order accuracy below. Give one strength and one next practice tip.', context: `Passage coverage: ${coveragePercent}%. Word-order accuracy: ${Math.round(metrics.accuracy * 100)}%. Local score: ${score}/5. Passage: ${state.currentBook.passage}\nStudent transcript: ${state.readingTranscript}` }), signal: AbortSignal.timeout(50000) }); const data = await response.json(); feedback.textContent = `Read-aloud score: ${score}/5 (${coveragePercent}% of the passage matched). ${data.answer || data.error || 'Keep practicing.'}`; } catch { feedback.textContent = `Read-aloud score: ${score}/5 (${coveragePercent}% of the passage matched). The AI tip is unavailable right now.`; } finally { $('#rate-reading').disabled = false; } }
+async function rateReading() { const feedback = $('#reading-feedback'); feedback.textContent = 'Rating…'; $('#rate-reading').disabled = true; const metrics = readingMetrics(); const coveragePercent = Math.round(metrics.coverage * 100); const score = Math.max(1, Math.min(5, Math.round(((metrics.coverage * 0.7) + (metrics.accuracy * 0.3)) * 5))); $('#reading-score-feedback').innerHTML = scoreFeedbackMarkup(coveragePercent); try { const response = await fetch(`${API_BASE}/api/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Give kind, specific feedback on this read-aloud. Do not invent a score; use the measured passage coverage and word-order accuracy below. Give one strength and one next practice tip.', context: `Passage coverage: ${coveragePercent}%. Word-order accuracy: ${Math.round(metrics.accuracy * 100)}%. Local score: ${score}/5. Passage: ${state.currentBook.passage}\nStudent transcript: ${state.readingTranscript}` }), signal: AbortSignal.timeout(50000) }); const data = await response.json(); feedback.textContent = `Read-aloud score: ${score}/5 (${coveragePercent}% of the passage matched). ${data.answer || errorMessage(data, 'Keep practicing.')}`; } catch { feedback.textContent = `Read-aloud score: ${score}/5 (${coveragePercent}% of the passage matched). The AI tip is unavailable right now.`; } finally { $('#rate-reading').disabled = false; } }
 
 async function startAiPractice(type = 'mixed') {
   if (type === 'ai') type = 'mixed';
@@ -416,7 +417,7 @@ async function startAiPractice(type = 'mixed') {
   try {
     const response = await fetch(`${API_BASE}/api/practice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: type === 'test' ? 'Not assessed yet' : progress.latestLevel, type: type === 'test' ? 'mixed' : type, weakSkills: progress.weakSkills || {} }), signal: AbortSignal.timeout(50000) });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'The AI could not make practice right now.');
+    if (!response.ok) throw new Error(errorMessage(data, 'The AI could not make practice right now.'));
     state.questions = normalizePracticeQuestions(data);
     state.passage = data.passage;
     state.index = 0;

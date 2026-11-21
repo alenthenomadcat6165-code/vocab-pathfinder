@@ -12,68 +12,101 @@ function loadEnv() {
 
 loadEnv();
 
-const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma3:1b';
+const KEYGEN_URL = (process.env.KEYGEN_URL || '').replace(/\/$/, '');
+const KEYGEN_TOKEN = process.env.KEYGEN_TOKEN || '';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const brief = fs.readFileSync(path.join(__dirname, 'BRIEF.md'), 'utf8');
+let cachedKey;
+let cachedExpiresAt = 0;
 
-async function ollamaRequest(endpoint, options = {}) {
+function keygenError(message, fix, code = 'KEYGEN_ERROR') {
+  const error = new Error(message);
+  error.fix = fix;
+  error.code = code;
+  return error;
+}
+
+async function getKey() {
+  if (cachedKey && Date.now() < cachedExpiresAt) return cachedKey;
+  if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'paste-here') {
+    cachedKey = process.env.OPENAI_API_KEY;
+    cachedExpiresAt = Number.MAX_SAFE_INTEGER;
+    return cachedKey;
+  }
+  if (!KEYGEN_URL || !KEYGEN_TOKEN || KEYGEN_URL === 'paste-here' || KEYGEN_TOKEN === 'paste-here') {
+    throw keygenError('The AI key service is not configured.', 'Add KEYGEN_URL and KEYGEN_TOKEN to the server .env file.', 'KEYGEN_CONFIG_MISSING');
+  }
   try {
-    return await fetch(`${OLLAMA_BASE_URL}${endpoint}`, {
-      ...options,
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-      signal: AbortSignal.timeout(45000)
+    const response = await fetch(`${KEYGEN_URL}/api/lookup-key`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${KEYGEN_TOKEN}` },
+      body: '{}',
+      signal: AbortSignal.timeout(15000)
     });
-  } catch (error) {
-    const offline = new Error('Ollama is not running. Start Ollama, then try again.');
-    offline.code = 'OLLAMA_OFFLINE';
-    throw offline;
-  }
-}
-
-async function checkOllama() {
-  try {
-    const response = await ollamaRequest('/api/tags');
-    if (!response.ok) return { ok: false, error: 'Ollama is not responding. Start Ollama, then refresh this page.' };
+    if (!response.ok) throw keygenError(`The AI key service returned HTTP ${response.status}.`, 'Check KEYGEN_URL, KEYGEN_TOKEN, and the MindDo key service.', 'KEYGEN_UNAVAILABLE');
     const data = await response.json();
-    const models = (data.models || []).map((model) => model.name);
-    const hasModel = models.some((name) => name === OLLAMA_MODEL || name.startsWith(`${OLLAMA_MODEL}:`));
-    return {
-      ok: hasModel,
-      model: OLLAMA_MODEL,
-      models,
-      error: hasModel ? undefined : `The ${OLLAMA_MODEL} model is not installed. Run: ollama pull ${OLLAMA_MODEL}`
-    };
+    const expiresAt = Date.parse(data.expiresAt);
+    if (typeof data.apiKey !== 'string' || !data.apiKey || !Number.isFinite(expiresAt)) {
+      throw keygenError('The AI key service returned an invalid key response.', 'MindDo must return JSON with apiKey and expiresAt.', 'KEYGEN_BAD_RESPONSE');
+    }
+    cachedKey = data.apiKey;
+    cachedExpiresAt = expiresAt;
+    return cachedKey;
   } catch (error) {
-    return { ok: false, model: OLLAMA_MODEL, error: error.message };
+    if (error.code?.startsWith('KEYGEN_')) throw error;
+    throw keygenError('The AI key service could not be reached.', 'Check your internet connection and KEYGEN_URL.', 'KEYGEN_OFFLINE');
   }
 }
 
-async function askOllama(userMessage, context = '', history = [], formatJson = false) {
-  const safeHistory = Array.isArray(history) ? history.slice(-8).filter((message) => message && (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string') : [];
-  const response = await ollamaRequest('/api/chat', {
+async function callOpenAI(apiKey, message, context, history, formatJson) {
+  const safeHistory = Array.isArray(history) ? history.slice(-8).filter((item) => item && (item.role === 'user' || item.role === 'assistant') && typeof item.content === 'string') : [];
+  const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      stream: false,
-      ...(formatJson ? { format: 'json' } : {}),
-      messages: [
-        { role: 'system', content: `${brief}\n\nYou are the Vocab Pathfinder assistant. You can explain learning topics, answer questions about how to use the website, and answer other harmless questions like a general assistant. Be kind, concise, specific, and age-appropriate. Never request private identifying information.` },
-        ...safeHistory,
-        { role: 'system', content: context ? `Stay connected to this active learning context:\n${context}\nAnswer the student's latest message about this context. If they ask for a hint, do not reveal the answer immediately.` : 'Keep the conversation connected to the student’s latest learning question.' },
-        { role: 'user', content: userMessage }
-      ]
-    })
+      model: OPENAI_MODEL,
+      instructions: `${brief}\n\nYou are the Vocab Pathfinder assistant. You can explain learning topics, answer questions about how to use the website, and answer other harmless questions like a general assistant. Be kind, concise, specific, and age-appropriate. Never request private identifying information. ${context ? `Stay connected to this active learning context:\n${context}` : ''}`,
+      input: [...safeHistory, { role: 'user', content: message }],
+      ...(formatJson ? { text: { format: { type: 'json_object' } } } : {})
+    }),
+    signal: AbortSignal.timeout(60000)
   });
   if (!response.ok) {
-    const error = new Error(response.status === 404
-      ? `The ${OLLAMA_MODEL} model is not installed. Run: ollama pull ${OLLAMA_MODEL}`
-      : 'Ollama could not answer right now. Check that Ollama is running and try again.');
-    error.code = response.status === 404 ? 'OLLAMA_MODEL_MISSING' : 'OLLAMA_ERROR';
-    throw error;
+    if (response.status === 401) throw keygenError('OpenAI rejected the AI key.', 'The key will be refreshed from MindDo once, then try your request again.', 'OPENAI_KEY_INVALID');
+    throw keygenError('The online AI could not answer right now.', 'Try again in a moment and check the server logs if it continues.', 'OPENAI_ERROR');
   }
   const data = await response.json();
-  return data.message?.content || 'I could not make a helpful answer this time. Let’s try again.';
+  return data.output_text || data.output?.flatMap((item) => item.content || []).map((item) => item.text || '').join('') || '';
 }
+
+async function openAiRequest(message, context = '', history = [], formatJson = false) {
+  let apiKey = await getKey();
+  try {
+    return await callOpenAI(apiKey, message, context, history, formatJson);
+  } catch (error) {
+    if (error.code !== 'OPENAI_KEY_INVALID') throw error;
+    cachedKey = undefined;
+    cachedExpiresAt = 0;
+    apiKey = await getKey();
+    return callOpenAI(apiKey, message, context, history, formatJson);
+  }
+}
+
+async function checkAI() {
+  try {
+    await getKey();
+    return {
+      ok: true,
+      provider: 'OpenAI via key generator',
+      model: OPENAI_MODEL
+    };
+  } catch (error) {
+    console.error(error.fix || error.message);
+    return { ok: false, provider: 'OpenAI via key generator', model: OPENAI_MODEL, error: { message: error.message, fix: error.fix }, code: error.code };
+  }
+}
+
+const askAI = openAiRequest;
 
 function fallbackPractice(weakSkills = {}, type = 'mixed') {
   if (type === 'reading') return [
@@ -106,7 +139,7 @@ async function createPractice({ level, type, weakSkills = {} }) {
   let lastError;
   for (const request of [prompt]) {
     try {
-      const raw = await askOllama(request, '', [], true);
+      const raw = await askAI(request, '', [], true);
       const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
       const firstBrace = cleaned.indexOf('{');
       const lastBrace = cleaned.lastIndexOf('}');
@@ -125,15 +158,15 @@ async function createPractice({ level, type, weakSkills = {} }) {
         const shift = (index + 1) % question.choices.length;
         return { ...question, choices: question.choices.slice(shift).concat(question.choices.slice(0, shift)), answer: (question.answer - shift + question.choices.length) % question.choices.length };
       });
-      return { title: String(practice.title || 'Your next practice'), passage: String(practice.passage || ''), questions: practice.questions, model: OLLAMA_MODEL };
+      return { title: String(practice.title || 'Your next practice'), passage: String(practice.passage || ''), questions: practice.questions, model: OPENAI_MODEL };
     } catch (error) {
       lastError = error;
     }
   }
-  if (lastError?.code !== 'OLLAMA_OFFLINE') return { title: 'Practice set', passage: type === 'reading' ? 'Maya found a small notebook beneath a bench at the library. She read the name on the first page and carried the notebook to the front desk. The librarian thanked Maya and placed it in a safe drawer. Maya felt glad that a careful choice had helped someone find a lost belonging.' : '', questions: fallbackPractice(weakSkills, type).map((question, index) => { const shift = (index + 1) % question.choices.length; return { ...question, choices: question.choices.slice(shift).concat(question.choices.slice(0, shift)), answer: (question.answer - shift + question.choices.length) % question.choices.length }; }), model: OLLAMA_MODEL, fallback: true };
+  if (!lastError?.code?.startsWith('KEYGEN_') && lastError?.code !== 'OPENAI_KEY_INVALID') return { title: 'Practice set', passage: type === 'reading' ? 'Maya found a small notebook beneath a bench at the library. She read the name on the first page and carried the notebook to the front desk. The librarian thanked Maya and placed it in a safe drawer. Maya felt glad that a careful choice had helped someone find a lost belonging.' : '', questions: fallbackPractice(weakSkills, type).map((question, index) => { const shift = (index + 1) % question.choices.length; return { ...question, choices: question.choices.slice(shift).concat(question.choices.slice(0, shift)), answer: (question.answer - shift + question.choices.length) % question.choices.length }; }), model: OPENAI_MODEL, fallback: true };
   const error = new Error(lastError.message);
-  error.code = lastError?.code || 'OLLAMA_BAD_PRACTICE';
+  error.code = lastError?.code || 'AI_BAD_PRACTICE';
   throw error;
 }
 
-module.exports = { askOllama, checkOllama, createPractice };
+module.exports = { askAI, checkAI, createPractice, getKey };

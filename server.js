@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
-const { askOllama, checkOllama, createPractice } = require('./ollama-client');
+const { askAI, checkAI, createPractice } = require('./ai-client');
 
 const PORT = Number(process.env.PORT || 3000);
 const publicDir = path.join(__dirname, 'public');
@@ -10,6 +10,11 @@ const publicDir = path.join(__dirname, 'public');
 function sendJson(res, status, data) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': 'null' });
   res.end(JSON.stringify(data));
+}
+
+function sendError(res, status, error, fallback) {
+  console.error(error.fix || error.message || fallback);
+  return sendJson(res, status, { error: { message: error.message || fallback, fix: error.fix || 'Try again later.' } });
 }
 
 function readBody(req) {
@@ -52,7 +57,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && requestUrl.pathname === '/api/health') {
-    const result = await checkOllama();
+    const result = await checkAI();
     return sendJson(res, result.ok ? 200 : 503, result);
   }
 
@@ -62,11 +67,11 @@ const server = http.createServer(async (req, res) => {
       if (!body.message || typeof body.message !== 'string') {
         return sendJson(res, 400, { error: 'Please send a learning question.' });
       }
-      const answer = await askOllama(body.message, String(body.context || ''), body.history || []);
+      const answer = await askAI(body.message, String(body.context || ''), body.history || []);
       return sendJson(res, 200, { answer });
     } catch (error) {
-      const status = error.code === 'OLLAMA_OFFLINE' ? 503 : 500;
-      return sendJson(res, status, { error: error.message || 'The learning guide could not answer.' });
+      const status = error.code?.startsWith('KEYGEN_') || error.code === 'OPENAI_KEY_INVALID' ? 503 : 500;
+      return sendError(res, status, error, 'The learning guide could not answer.');
     }
   }
 
@@ -77,8 +82,8 @@ const server = http.createServer(async (req, res) => {
       const practice = await createPractice({ level: String(body.level), type: String(body.type), weakSkills: body.weakSkills || {} });
       return sendJson(res, 200, practice);
     } catch (error) {
-      const status = error.code === 'OLLAMA_OFFLINE' ? 503 : 500;
-      return sendJson(res, status, { error: error.message || 'The AI could not create practice.' });
+      const status = error.code?.startsWith('KEYGEN_') || error.code === 'OPENAI_KEY_INVALID' ? 503 : 500;
+      return sendError(res, status, error, 'The AI could not create practice.');
     }
   }
 

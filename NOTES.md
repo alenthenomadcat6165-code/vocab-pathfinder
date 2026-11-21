@@ -2,9 +2,8 @@
 
 ## How to run it
 
-1. Install Ollama for Mac and make sure it is running.
-2. In Terminal, run `ollama pull gemma3:1b` once.
-3. In this folder, run:
+1. Make sure the server-only key-generator settings are in `.env`.
+2. In this folder, run:
 
    `npm start`
 
@@ -29,16 +28,15 @@
 - Each reading passage now has three paragraphs with at least five sentences per paragraph.
 - Reading questions stay locked until a read-aloud recording finishes with a transcript.
 - Vocabulary quizzes, reading practice, and progress tracking work in the browser.
-- The backend sends requests to local Ollama at `http://127.0.0.1:11434` using `gemma3:1b`.
+- The backend gets an OpenAI key from the server-only `getKey()` helper. It POSTs to `KEYGEN_URL/api/lookup-key` with `KEYGEN_TOKEN`, caches the returned key until `expiresAt`, and refreshes it once if OpenAI rejects it.
 - The AI receives the project safety and teaching instructions from `BRIEF.md` with every message.
-- Ollama requests stay on the backend; no OpenAI key is needed.
+- Key-generator requests and OpenAI requests stay on the backend; neither token is sent to browser code.
 - Saves on this computer only for now.
 - Vercel setup: the `api/index.js` Vercel Function serves `/api/health`, `/api/ai`, and `/api/practice`; the existing `public/` files are served as the website.
-- Online AI uses the server-only `OPENAI_API_KEY` environment variable. `OPENAI_MODEL` is optional and defaults to `gpt-4o-mini`.
-- Local development still uses the existing Ollama server and `OLLAMA_BASE_URL`/`OLLAMA_MODEL` settings.
-- To deploy, import this GitHub repository into Vercel, keep the framework preset as Other, and add `OPENAI_API_KEY` under Project Settings → Environment Variables for the environments you use. Do not add the key to `.env`, Git, or browser code.
+- The AI model is controlled by server-only `OPENAI_MODEL` and defaults to `gpt-4o-mini`.
+- To deploy, import this GitHub repository into Vercel, keep the framework preset as Other, and add `KEYGEN_URL`, `KEYGEN_TOKEN`, and optionally `OPENAI_MODEL` under Project Settings → Environment Variables for the environments you use. Do not add the token or generated key to Git, public files, or browser code.
 - The MVP reading-level check is available from the home page. It requests six AI reading questions and a passage through the backend, scores the answers into an estimated level, saves that level in browser progress, and opens the next practice step.
-- GitHub Pages publishes the `public/` website through `.github/workflows/pages.yml`. GitHub Pages can serve the interface, but it cannot run the Node/Ollama backend; use the Vercel deployment for AI features.
+- GitHub Pages publishes the `public/` website through `.github/workflows/pages.yml`. GitHub Pages can serve the interface, but it cannot run the Node backend; use the Vercel deployment for AI features.
 - Vocabulary questions use varied context-clue, situation, cloze, definition, clue-selection, and sentence-use formats. The question design follows the approach described by [iRead's vocabulary-in-context guide](https://iread.education/resources/reading-quizzes/vocabulary-in-context-questions), without copying protected textbook questions.
 - Score feedback uses four cat images supplied for the project; the score message is shown beside the matching photo.
 
